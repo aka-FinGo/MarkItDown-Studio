@@ -3,6 +3,7 @@ import JSZip from "jszip";
 import mammoth from "mammoth";
 import TurndownService from "turndown";
 import * as pdfjsLib from "pdfjs-dist";
+import { createWorker } from "tesseract.js";
 import { ConvertedItem, ConversionOptions } from "../types";
 
 // Configure PDF.js worker, CMaps and Standard Fonts for 100% accurate Cyrillic (қ, ғ, ў, ҳ) & Latin rendering
@@ -70,6 +71,19 @@ function normalizeText(text: string): string {
     .normalize("NFC")
     .replace(/\u00A0/g, " ")
     .replace(/[\u200B-\u200D\uFEFF]/g, "");
+}
+
+// Client-Side Offline WebAssembly OCR via Tesseract.js
+export async function runClientOfflineOcr(imageSource: Blob | string): Promise<string> {
+  try {
+    const worker = await createWorker("eng+rus");
+    const ret = await worker.recognize(imageSource);
+    await worker.terminate();
+    return ret.data.text.trim();
+  } catch (err) {
+    console.warn("Offline OCR warning:", err);
+    return "";
+  }
 }
 
 // 1. PDF Conversion with full CMap and Cyrillic glyph support
@@ -391,7 +405,7 @@ export async function convertWithOpenAiApi(
   return { markdown: rawMd.trim(), tokensConsumed: tokenUsage };
 }
 
-// 8. Main Browser File Conversion Dispatcher without Mundarija
+// 8. Main Browser File Conversion Dispatcher with WebAssembly Offline OCR
 export async function convertFileClient(
   file: File,
   options: ConversionOptions = {},
@@ -443,9 +457,21 @@ export async function convertFileClient(
       markdown += `> 🤖 **[AI OCR / ${isAudio ? "Audio Transkripsiya" : "Tasvir Tahlili"}]** *(Ushbu qism \`${provider}\` - \`${modelName}\` modeli yordamida tayyorlandi, tekshirib ko'ring)*:\n>\n` +
         aiResult.markdown.split("\n").map((l) => `> ${l}`).join("\n");
     } else {
+      // 100% Client-side WebAssembly Offline OCR
       markdown = `# 📄 ${cleanTitle}\n\n> 📌 **${isAudio ? "Audio" : "Tasvir"}:** \`${file.name}\` | **Format:** ${ext.toUpperCase()}\n\n`;
-      if (!isAudio) markdown += `![${file.name}](${file.name})\n\n`;
-      markdown += `> ⚠️ *(Ushbu rasm/audio yuklandi. AI API kaliti ulanmagani sababli matn ajratib olinmadi)*\n`;
+      if (!isAudio) {
+        markdown += `![${file.name}](${file.name})\n\n`;
+        const offlineText = await runClientOfflineOcr(file);
+        if (offlineText) {
+          engine = "WebAssembly Oflayn OCR";
+          markdown += `> ⚡ **[WebAssembly Oflayn OCR]** *(Ushbu hujjat internet va API kalitsiz, brauzer ichida oflayn o'qildi)*:\n>\n` +
+            offlineText.split("\n").map((l) => `> ${l}`).join("\n");
+        } else {
+          markdown += `> ⚠️ *(Ushbu rasm saqlandi)*\n`;
+        }
+      } else {
+        markdown += `> ⚠️ *(Ushbu audio yuklandi. Ovozli transkripsiya uchun AI API kaliti kerak)*\n`;
+      }
     }
   } else if (ext === "pdf") {
     const arrayBuffer = await file.arrayBuffer();
@@ -473,7 +499,7 @@ export async function convertFileClient(
         for (const p of pages) {
           docBody += `## Sahifa ${p.pageNum}\n\n`;
           docBody += `![page_${p.pageNum}.png](page_${p.pageNum}.png)\n`;
-          docBody += `> ⚠️ *(Ushbu rasm saqlandi. AI API kaliti ulanmagani sababli rasmdagi matn ajratib olinmadi)*\n\n---\n\n`;
+          docBody += `> ⚠️ *(Ushbu rasm saqlandi)*\n\n---\n\n`;
         }
       }
     } else {
@@ -489,7 +515,7 @@ export async function convertFileClient(
           if (hasApiKey) {
             docBody += `> 🤖 **[AI OCR / Tasvir Tahlili]** *(Ushbu qism \`${provider}\` - \`${modelName}\` modeli yordamida tekshirildi)*\n\n`;
           } else {
-            docBody += `> ⚠️ *(Ushbu sahifada rasm mavjud. AI API kaliti ulanmagani sababli rasmdagi matn ajratib olinmadi)*\n\n`;
+            docBody += `> ⚠️ *(Ushbu sahifada rasm mavjud)*\n\n`;
           }
         }
         if (totalPages > 1 && i < pages.length - 1) {
@@ -585,7 +611,7 @@ export async function convertUrlClient(
     markdown = turndownService.turndown(html);
   }
 
-  const cleanMd = `# 🌐 ${title}\n\n> 📌 **Manba:** [${url}](${url})\n\n---\n\n${markdown.trim()}`;
+  const cleanMd = `# 🌐 ${title}\n\n> 📌 **Manba:** [${url}](${url})\n\n---\n\n${markdown.Trim ? markdown.Trim() : markdown.trim()}`;
   const durationMs = Date.now() - startTime;
 
   return {

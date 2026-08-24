@@ -1,7 +1,7 @@
 {
   "name": "markitdown-studio",
   "private": true,
-  "version": "1.0.0",
+  "version": "0.0.2",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -29,6 +29,7 @@
     "react-dom": "^19.0.1",
     "react-markdown": "^10.1.0",
     "remark-gfm": "^4.0.1",
+    "tesseract.js": "^7.0.0",
     "turndown": "^7.2.4",
     "vite": "^6.2.3",
     "xlsx": "^0.18.5"

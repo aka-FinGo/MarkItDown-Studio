@@ -4,6 +4,7 @@ using System.Text.RegularExpressions;
 using MarkItDown.Core.Ai;
 using MarkItDown.Core.Converters;
 using MarkItDown.Core.Models;
+using MarkItDown.Core.Ocr;
 
 namespace MarkItDown.Core;
 
@@ -117,8 +118,23 @@ public class MarkItDownEngine
                 {
                     imgSb.AppendLine($"![{fileName}]({fileName})");
                     imgSb.AppendLine();
+
+                    // Run Windows Native Offline OCR
+                    var offlineText = await WindowsNativeOcr.RecognizeTextAsync(fileBytes);
+                    if (!string.IsNullOrWhiteSpace(offlineText))
+                    {
+                        engineName = "Windows Native Oflayn OCR";
+                        imgSb.AppendLine($"> ⚡ **[Windows Native Oflayn OCR]** *(Ushbu rasm internet va API kalitsiz, 100% oflayn OCR dvigateli orqali o'qildi)*:\n>\n" + IndentQuote(offlineText));
+                    }
+                    else
+                    {
+                        imgSb.AppendLine($"> ⚠️ *(Ushbu rasm saqlandi. Matn aniqlanmadi)*");
+                    }
                 }
-                imgSb.AppendLine($"> ⚠️ *(Ushbu rasm/audio yuklandi. AI API kaliti ulanmagani sababli matn ajratib olinmadi)*");
+                else
+                {
+                    imgSb.AppendLine($"> ⚠️ *(Ushbu audio yuklandi. Ovozli transkripsiya uchun AI kalit kerak)*");
+                }
                 markdown = imgSb.ToString().Trim();
             }
         }

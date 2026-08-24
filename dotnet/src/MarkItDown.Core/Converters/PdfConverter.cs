@@ -1,6 +1,7 @@
 using System.Text;
 using MarkItDown.Core.Ai;
 using MarkItDown.Core.Models;
+using MarkItDown.Core.Ocr;
 using UglyToad.PdfPig;
 using UglyToad.PdfPig.Content;
 
@@ -141,7 +142,7 @@ public class PdfConverter
             return FormatDocument(fileName, totalPages, bodySb.ToString());
         }
 
-        // 2. Normal PDF or Scanned without Key
+        // 2. Normal PDF or Scanned with Windows Native Offline OCR Fallback
         for (var idx = 0; idx < pageTextList.Count; idx++)
         {
             var (pageNum, text, images) = pageTextList[idx];
@@ -163,7 +164,7 @@ public class PdfConverter
                 bodySb.AppendLine();
             }
 
-            // Embedded Images on this page
+            // Embedded Images on this page (Run Windows Native OCR if no API key)
             foreach (var (imgName, imgData) in images)
             {
                 var relativeImgPath = $"{attachmentFolder}/{imgName}";
@@ -186,7 +187,16 @@ public class PdfConverter
                 }
                 else
                 {
-                    bodySb.AppendLine($"> ⚠️ *(Ushbu rasm `{relativeImgPath}` manzilida saqlandi. AI API kaliti ulanmagani sababli rasmdagi matn ajratib olinmadi)*");
+                    // 100% Offline Windows Native OCR
+                    var offlineText = await WindowsNativeOcr.RecognizeTextAsync(imgData);
+                    if (!string.IsNullOrWhiteSpace(offlineText))
+                    {
+                        bodySb.AppendLine($"> ⚡ **[Windows Native Oflayn OCR]** *(Ushbu rasm internet va API kalitsiz, 100% oflayn OCR dvigateli orqali o'qildi)*:\n>\n" + IndentQuote(offlineText));
+                    }
+                    else
+                    {
+                        bodySb.AppendLine($"> ⚠️ *(Ushbu rasm `{relativeImgPath}` manzilida saqlandi)*");
+                    }
                 }
                 bodySb.AppendLine();
             }
