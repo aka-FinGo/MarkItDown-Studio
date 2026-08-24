@@ -1,6 +1,6 @@
 export interface ConversionOptions {
-  enableAi: boolean;
-  includeFrontmatter: boolean;
+  enableAi?: boolean;
+  includeFrontmatter?: boolean;
   includeSummary?: boolean;
   tableStyle?: "standard" | "compact" | "html";
   customPrompt?: string;

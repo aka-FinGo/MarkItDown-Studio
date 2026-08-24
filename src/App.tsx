@@ -21,8 +21,14 @@ import { MarkdownViewer } from "./components/MarkdownViewer";
 import { SamplePicker } from "./components/SamplePicker";
 import { ApiDocsModal } from "./components/ApiDocsModal";
 import { SupportedFormatsModal } from "./components/SupportedFormatsModal";
+import { ApiKeyModal } from "./components/ApiKeyModal";
 import { ConvertedItem, ConversionOptions } from "./types";
 import { SampleFile } from "./data/samples";
+import {
+  convertFileClient,
+  convertUrlClient,
+  convertTextClient,
+} from "./services/converterService";
 
 export default function App() {
   const [activeTab, setActiveTab] = useState<"upload" | "url" | "text">("upload");
@@ -33,6 +39,7 @@ export default function App() {
     customPrompt: "",
   });
 
+  const [geminiApiKey, setGeminiApiKey] = useState<string>("");
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
   const [convertedItems, setConvertedItems] = useState<ConvertedItem[]>([]);
   const [activeItemId, setActiveItemId] = useState<string>("");
@@ -42,9 +49,15 @@ export default function App() {
 
   const [isApiDocsOpen, setIsApiDocsOpen] = useState(false);
   const [isFormatsOpen, setIsFormatsOpen] = useState(false);
+  const [isApiKeyModalOpen, setIsApiKeyModalOpen] = useState(false);
 
   // Load from localStorage on mount
   useEffect(() => {
+    const savedKey = localStorage.getItem("markitdown_gemini_api_key");
+    if (savedKey) {
+      setGeminiApiKey(savedKey);
+    }
+
     const saved = localStorage.getItem("markitdown_items");
     if (saved) {
       try {
@@ -59,7 +72,7 @@ export default function App() {
     }
   }, []);
 
-  // Save to localStorage
+  // Save items to localStorage
   useEffect(() => {
     if (convertedItems.length > 0) {
       localStorage.setItem("markitdown_items", JSON.stringify(convertedItems.slice(0, 15)));
@@ -67,6 +80,15 @@ export default function App() {
       localStorage.removeItem("markitdown_items");
     }
   }, [convertedItems]);
+
+  const handleSaveApiKey = (key: string) => {
+    setGeminiApiKey(key);
+    if (key) {
+      localStorage.setItem("markitdown_gemini_api_key", key);
+    } else {
+      localStorage.removeItem("markitdown_gemini_api_key");
+    }
+  };
 
   const handleFilesSelected = (newFiles: File[]) => {
     setSelectedFiles((prev) => [...prev, ...newFiles]);
@@ -81,7 +103,7 @@ export default function App() {
     setSelectedFiles([]);
   };
 
-  // Convert uploaded files
+  // Convert uploaded files (100% in-browser)
   const handleConvertFiles = async () => {
     if (selectedFiles.length === 0) return;
     setIsConverting(true);
@@ -89,34 +111,19 @@ export default function App() {
     setErrorMessage(null);
 
     try {
-      const formData = new FormData();
-      selectedFiles.forEach((file) => {
-        formData.append("files", file);
-      });
-      formData.append("enableAi", String(options.enableAi));
-      formData.append("includeFrontmatter", String(options.includeFrontmatter || false));
-      formData.append("tableStyle", options.tableStyle || "standard");
-      if (options.customPrompt) {
-        formData.append("customPrompt", options.customPrompt);
+      const allResults: ConvertedItem[] = [];
+
+      for (let i = 0; i < selectedFiles.length; i++) {
+        const file = selectedFiles[i];
+        setConversionStatusMsg(`Fayl tahlil qilinmoqda (${i + 1}/${selectedFiles.length}): ${file.name}`);
+        const results = await convertFileClient(file, options, geminiApiKey);
+        allResults.push(...results);
       }
 
-      const res = await fetch("/api/convert", {
-        method: "POST",
-        body: formData,
-      });
-
-      const data = await res.json();
-      if (!res.ok || !data.success) {
-        throw new Error(data.error || "Fayllarni o'girishda xatolik yuz berdi");
+      setConvertedItems((prev) => [...allResults, ...prev]);
+      if (allResults.length > 0) {
+        setActiveItemId(allResults[0].id);
       }
-
-      const newResults: ConvertedItem[] = data.results.map((r: any) => ({
-        ...r,
-        status: "success",
-      }));
-
-      setConvertedItems((prev) => [...newResults, ...prev]);
-      setActiveItemId(newResults[0].id);
       setSelectedFiles([]);
     } catch (err: any) {
       console.error("Conversion error:", err);
@@ -127,34 +134,14 @@ export default function App() {
     }
   };
 
-  // Convert URL
+  // Convert URL (100% in-browser via r.jina.ai)
   const handleConvertUrl = async (url: string) => {
     setIsConverting(true);
-    setConversionStatusMsg("Web sahifa yuklanib, Markdown matniga o'tkazilmoqda...");
+    setConversionStatusMsg("Web sahifa yuklanib, toza Markdown matniga o'tkazilmoqda...");
     setErrorMessage(null);
 
     try {
-      const res = await fetch("/api/convert-url", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          url,
-          enableAi: options.enableAi,
-          includeFrontmatter: options.includeFrontmatter || false,
-          customPrompt: options.customPrompt,
-        }),
-      });
-
-      const data = await res.json();
-      if (!res.ok || !data.success) {
-        throw new Error(data.error || "Web havolani o'girib bo'lmadi");
-      }
-
-      const newItem: ConvertedItem = {
-        ...data.result,
-        status: "success",
-      };
-
+      const newItem = await convertUrlClient(url, options, geminiApiKey);
       setConvertedItems((prev) => [newItem, ...prev]);
       setActiveItemId(newItem.id);
     } catch (err: any) {
@@ -166,36 +153,14 @@ export default function App() {
     }
   };
 
-  // Convert raw text snippet
+  // Convert raw text snippet (100% in-browser)
   const handleConvertText = async (text: string, format: string, filename: string) => {
     setIsConverting(true);
     setConversionStatusMsg("Matn tahlil qilinib, Markdown formatiga keltirilmoqda...");
     setErrorMessage(null);
 
     try {
-      const res = await fetch("/api/convert-text", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          text,
-          format,
-          filename,
-          enableAi: options.enableAi,
-          includeFrontmatter: options.includeFrontmatter || false,
-          customPrompt: options.customPrompt,
-        }),
-      });
-
-      const data = await res.json();
-      if (!res.ok || !data.success) {
-        throw new Error(data.error || "Matnni o'girib bo'lmadi");
-      }
-
-      const newItem: ConvertedItem = {
-        ...data.result,
-        status: "success",
-      };
-
+      const newItem = convertTextClient(text, format, filename, options);
       setConvertedItems((prev) => [newItem, ...prev]);
       setActiveItemId(newItem.id);
     } catch (err: any) {
@@ -252,6 +217,8 @@ export default function App() {
       <Header
         onOpenApiDocs={() => setIsApiDocsOpen(true)}
         onOpenFormats={() => setIsFormatsOpen(true)}
+        onOpenApiKey={() => setIsApiKeyModalOpen(true)}
+        hasApiKey={Boolean(geminiApiKey)}
       />
 
       {/* Main Container */}
@@ -265,7 +232,7 @@ export default function App() {
             </div>
             <button
               onClick={() => setErrorMessage(null)}
-              className="text-red-500 hover:text-red-700 font-semibold"
+              className="text-red-500 hover:text-red-700 font-semibold cursor-pointer"
             >
               Yopish
             </button>
@@ -282,7 +249,7 @@ export default function App() {
             <button
               onClick={() => setActiveTab("upload")}
               id="tab-btn-upload"
-              className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-semibold transition-all ${
+              className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-semibold transition-all cursor-pointer ${
                 activeTab === "upload"
                   ? "bg-zinc-900 text-white shadow-xs"
                   : "text-zinc-600 hover:text-zinc-900 hover:bg-zinc-200/60"
@@ -300,7 +267,7 @@ export default function App() {
             <button
               onClick={() => setActiveTab("url")}
               id="tab-btn-url"
-              className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-semibold transition-all ${
+              className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-semibold transition-all cursor-pointer ${
                 activeTab === "url"
                   ? "bg-zinc-900 text-white shadow-xs"
                   : "text-zinc-600 hover:text-zinc-900 hover:bg-zinc-200/60"
@@ -313,7 +280,7 @@ export default function App() {
             <button
               onClick={() => setActiveTab("text")}
               id="tab-btn-text"
-              className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-semibold transition-all ${
+              className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-semibold transition-all cursor-pointer ${
                 activeTab === "text"
                   ? "bg-zinc-900 text-white shadow-xs"
                   : "text-zinc-600 hover:text-zinc-900 hover:bg-zinc-200/60"
@@ -399,14 +366,20 @@ export default function App() {
           <div className="flex items-center space-x-4 text-zinc-400">
             <span>100% Toza Markdown (.md)</span>
             <span>•</span>
-            <span>OCR Rasmdan Matn</span>
+            <span>Lokal va Brauzerda Ishlaydi</span>
             <span>•</span>
-            <span>Audio Transkripsiya</span>
+            <span>0 Server Ehtiyoji</span>
           </div>
         </div>
       </footer>
 
       {/* Modals */}
+      <ApiKeyModal
+        isOpen={isApiKeyModalOpen}
+        onClose={() => setIsApiKeyModalOpen(false)}
+        onSaveApiKey={handleSaveApiKey}
+        currentKey={geminiApiKey}
+      />
       <ApiDocsModal isOpen={isApiDocsOpen} onClose={() => setIsApiDocsOpen(false)} />
       <SupportedFormatsModal isOpen={isFormatsOpen} onClose={() => setIsFormatsOpen(false)} />
     </div>
