@@ -5,29 +5,29 @@
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         mc:Ignorable="d"
         Title="MarkItDown Studio .NET"
-        Height="820" Width="1280"
-        MinHeight="650" MinWidth="950"
+        Height="840" Width="1320"
+        MinHeight="650" MinWidth="980"
         WindowStyle="None"
         AllowsTransparency="True"
         Background="Transparent"
         WindowStartupLocation="CenterScreen">
 
-    <!-- Outer Glass Container with Glow Border and Rounded Corners -->
-    <Border CornerRadius="16" Background="#0F172A" BorderBrush="#334155" BorderThickness="1.5" Margin="10">
+    <!-- Outer Window Border with Glowing Glassmorphic Shadow -->
+    <Border x:Name="MainBorder" CornerRadius="16" Background="#0F172A" BorderBrush="#334155" BorderThickness="1.5" Margin="10">
         <Border.Effect>
-            <DropShadowEffect Color="#000000" BlurRadius="25" ShadowDepth="8" Opacity="0.5" />
+            <DropShadowEffect Color="#000000" BlurRadius="28" ShadowDepth="10" Opacity="0.55" />
         </Border.Effect>
 
         <Grid>
             <Grid.RowDefinitions>
                 <RowDefinition Height="46" /> <!-- Custom Title Bar -->
-                <RowDefinition Height="Auto" /> <!-- AI & Settings Header Bar -->
-                <RowDefinition Height="*" /> <!-- Main Studio Workspace -->
+                <RowDefinition Height="Auto" /> <!-- Multi-Provider AI & Theme Bar -->
+                <RowDefinition Height="*" /> <!-- Studio Workspace -->
                 <RowDefinition Height="36" /> <!-- Footer Status Bar -->
             </Grid.RowDefinitions>
 
             <!-- 1. Custom Title Bar -->
-            <Border Grid.Row="0" Background="#1E293B" CornerRadius="15,15,0,0" BorderBrush="#334155" BorderThickness="0,0,0,1" MouseDown="TitleBar_MouseDown">
+            <Border x:Name="TitleBarBorder" Grid.Row="0" Background="#1E293B" CornerRadius="15,15,0,0" BorderBrush="#334155" BorderThickness="0,0,0,1" MouseDown="TitleBar_MouseDown">
                 <Grid Margin="14,0,10,0">
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="Auto" />
@@ -37,17 +37,30 @@
 
                     <!-- Brand / App Title -->
                     <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center">
-                        <Border Width="26" Height="26" Background="#6366F1" CornerRadius="7" Margin="0,0,10,0">
+                        <Border x:Name="LogoBadge" Width="26" Height="26" Background="#6366F1" CornerRadius="7" Margin="0,0,10,0">
                             <TextBlock Text="MD" Foreground="White" FontWeight="Bold" FontSize="11" HorizontalAlignment="Center" VerticalAlignment="Center" />
                         </Border>
-                        <TextBlock Text="MarkItDown Studio" Foreground="#F8FAFC" FontWeight="Bold" FontSize="14" VerticalAlignment="Center" />
+                        <TextBlock x:Name="TxtAppTitle" Text="MarkItDown Studio" Foreground="#F8FAFC" FontWeight="Bold" FontSize="14" VerticalAlignment="Center" />
                         <Border Background="#064E3B" BorderBrush="#059669" BorderThickness="1" CornerRadius="6" Padding="6,2" Margin="10,0,0,0">
-                            <TextBlock Text=".NET 10 + Universal AI" Foreground="#34D399" FontSize="10" FontWeight="SemiBold" />
+                            <TextBlock Text="Obsidian &amp; Multi-AI Ready" Foreground="#34D399" FontSize="10" FontWeight="SemiBold" />
                         </Border>
                     </StackPanel>
 
-                    <!-- Window Control Buttons -->
+                    <!-- Theme Switcher & Window Control Buttons -->
                     <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
+                        <!-- Theme Picker -->
+                        <StackPanel Orientation="Horizontal" Margin="0,0,16,0" VerticalAlignment="Center">
+                            <TextBlock Text="🎨 Mavzu:" Foreground="#94A3B8" FontSize="11" VerticalAlignment="Center" Margin="0,0,6,0" />
+                            <ComboBox x:Name="CmbTheme" Width="135" Height="26" SelectionChanged="CmbTheme_SelectionChanged"
+                                      Background="#0F172A" Foreground="#F8FAFC" BorderBrush="#334155" FontSize="11" Padding="4,2">
+                                <ComboBoxItem Content="Midnight Glass" Tag="MidnightGlass" IsSelected="True" />
+                                <ComboBoxItem Content="Obsidian Dark" Tag="ObsidianDark" />
+                                <ComboBoxItem Content="Cyberpunk Neon" Tag="CyberpunkNeon" />
+                                <ComboBoxItem Content="Frosted Crystal" Tag="FrostedCrystal" />
+                            </ComboBox>
+                        </StackPanel>
+
+                        <!-- Window Buttons -->
                         <Button Click="BtnMinimize_Click" Style="{StaticResource GlassButton}" Width="32" Height="28" Padding="0" Margin="0,0,4,0" ToolTip="Kichraytirish">
                             <TextBlock Text="─" Foreground="#94A3B8" FontSize="10" FontWeight="Bold" />
                         </Button>
@@ -55,31 +68,26 @@
                             <TextBlock Text="▢" Foreground="#94A3B8" FontSize="11" />
                         </Button>
                         <Button Click="BtnClose_Click" Style="{StaticResource GlassButton}" Width="32" Height="28" Padding="0" ToolTip="Yopish">
-                            <Button.Resources>
-                                <Style TargetType="Border">
-                                    <Setter Property="CornerRadius" Value="8"/>
-                                </Style>
-                            </Button.Resources>
                             <TextBlock Text="✕" Foreground="#F87171" FontSize="11" FontWeight="Bold" />
                         </Button>
                     </StackPanel>
                 </Grid>
             </Border>
 
-            <!-- 2. AI Settings & Controls Bar -->
-            <Border Grid.Row="1" Background="#162032" BorderBrush="#334155" BorderThickness="0,0,0,1" Padding="14,10">
+            <!-- 2. AI Settings & Multi-Provider Bar -->
+            <Border x:Name="SettingsBarBorder" Grid.Row="1" Background="#162032" BorderBrush="#334155" BorderThickness="0,0,0,1" Padding="14,10">
                 <Grid>
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="*" />
                         <ColumnDefinition Width="Auto" />
                     </Grid.ColumnDefinitions>
 
-                    <!-- Left: AI Provider Controls -->
+                    <!-- Left: Provider & Model Selector -->
                     <WrapPanel Grid.Column="0" VerticalAlignment="Center">
                         <!-- Provider Selector -->
-                        <StackPanel Orientation="Horizontal" Margin="0,0,16,0" VerticalAlignment="Center">
-                            <TextBlock Text="AI Provayder:" Foreground="#94A3B8" FontSize="12" VerticalAlignment="Center" Margin="0,0,8,0" />
-                            <ComboBox x:Name="CmbAiProvider" Width="150" Height="30" SelectionChanged="CmbAiProvider_SelectionChanged"
+                        <StackPanel Orientation="Horizontal" Margin="0,0,14,0" VerticalAlignment="Center">
+                            <TextBlock Text="AI Provayder:" Foreground="#94A3B8" FontSize="12" VerticalAlignment="Center" Margin="0,0,6,0" />
+                            <ComboBox x:Name="CmbAiProvider" Width="145" Height="30" SelectionChanged="CmbAiProvider_SelectionChanged"
                                       Background="#0F172A" Foreground="#F8FAFC" BorderBrush="#334155" Padding="6,4">
                                 <ComboBoxItem Content="Google Gemini" IsSelected="True" Tag="GoogleGemini" />
                                 <ComboBoxItem Content="OpenAI" Tag="OpenAI" />
@@ -91,30 +99,33 @@
                         </StackPanel>
 
                         <!-- Model Name -->
-                        <StackPanel Orientation="Horizontal" Margin="0,0,16,0" VerticalAlignment="Center">
-                            <TextBlock Text="Model:" Foreground="#94A3B8" FontSize="12" VerticalAlignment="Center" Margin="0,0,8,0" />
+                        <StackPanel Orientation="Horizontal" Margin="0,0,14,0" VerticalAlignment="Center">
+                            <TextBlock Text="Model:" Foreground="#94A3B8" FontSize="12" VerticalAlignment="Center" Margin="0,0,6,0" />
                             <ComboBox x:Name="CmbModelName" Width="170" Height="30" IsEditable="True"
-                                      Background="#0F172A" Foreground="#F8FAFC" BorderBrush="#334155" Padding="6,4" />
+                                      Background="#0F172A" Foreground="#F8FAFC" BorderBrush="#334155" Padding="6,4"
+                                      LostFocus="CmbModelName_LostFocus" />
                         </StackPanel>
 
                         <!-- API Key -->
-                        <StackPanel Orientation="Horizontal" Margin="0,0,16,0" VerticalAlignment="Center">
-                            <TextBlock Text="API Kalit:" Foreground="#94A3B8" FontSize="12" VerticalAlignment="Center" Margin="0,0,8,0" />
-                            <PasswordBox x:Name="TxtApiKey" Width="190" Height="30" PasswordChar="●"
-                                         Background="#0F172A" Foreground="#F8FAFC" BorderBrush="#334155" Padding="6,4" VerticalContentAlignment="Center" />
+                        <StackPanel Orientation="Horizontal" Margin="0,0,14,0" VerticalAlignment="Center">
+                            <TextBlock Text="API Kalit:" Foreground="#94A3B8" FontSize="12" VerticalAlignment="Center" Margin="0,0,6,0" />
+                            <PasswordBox x:Name="TxtApiKey" Width="185" Height="30" PasswordChar="●"
+                                         Background="#0F172A" Foreground="#F8FAFC" BorderBrush="#334155" Padding="6,4" VerticalContentAlignment="Center"
+                                         PasswordChanged="TxtApiKey_PasswordChanged" />
                         </StackPanel>
 
                         <!-- Custom URL (for Ollama/Custom) -->
-                        <StackPanel x:Name="PnlCustomBaseUrl" Orientation="Horizontal" Margin="0,0,16,0" VerticalAlignment="Center" Visibility="Collapsed">
-                            <TextBlock Text="Base URL:" Foreground="#94A3B8" FontSize="12" VerticalAlignment="Center" Margin="0,0,8,0" />
-                            <TextBox x:Name="TxtCustomBaseUrl" Width="180" Height="30" Text="http://localhost:11434" Style="{StaticResource GlassTextBox}" />
+                        <StackPanel x:Name="PnlCustomBaseUrl" Orientation="Horizontal" Margin="0,0,14,0" VerticalAlignment="Center" Visibility="Collapsed">
+                            <TextBlock Text="Base URL:" Foreground="#94A3B8" FontSize="12" VerticalAlignment="Center" Margin="0,0,6,0" />
+                            <TextBox x:Name="TxtCustomBaseUrl" Width="175" Height="30" Text="http://localhost:11434" Style="{StaticResource GlassTextBox}"
+                                     LostFocus="TxtCustomBaseUrl_LostFocus" />
                         </StackPanel>
                     </WrapPanel>
 
-                    <!-- Right: Options Toggles -->
+                    <!-- Right: Save / Status Indicators -->
                     <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
-                        <CheckBox x:Name="ChkEnableAi" Content="AI Faol (OCR/Audio)" Foreground="#F8FAFC" FontSize="12" VerticalAlignment="Center" Margin="0,0,14,0" IsChecked="True" />
-                        <CheckBox x:Name="ChkFrontmatter" Content="YAML Frontmatter" Foreground="#94A3B8" FontSize="12" VerticalAlignment="Center" Margin="0,0,14,0" />
+                        <TextBlock x:Name="TxtKeyStatus" Text="🔒 Kalit xavfsiz saqlandi" Foreground="#10B981" FontSize="11" VerticalAlignment="Center" Margin="0,0,12,0" />
+                        <CheckBox x:Name="ChkEnableAi" Content="AI Vision OCR" Foreground="#F8FAFC" FontSize="12" VerticalAlignment="Center" IsChecked="True" Checked="ChkEnableAi_Changed" Unchecked="ChkEnableAi_Changed" />
                     </StackPanel>
                 </Grid>
             </Border>
@@ -122,7 +133,7 @@
             <!-- 3. Main Workspace Grid -->
             <Grid Grid.Row="2" Margin="14">
                 <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="380" MinWidth="280" MaxWidth="500" />
+                    <ColumnDefinition Width="380" MinWidth="280" MaxWidth="520" />
                     <ColumnDefinition Width="12" />
                     <ColumnDefinition Width="*" />
                 </Grid.ColumnDefinitions>
@@ -138,21 +149,21 @@
                     <!-- Glowing Drop Zone -->
                     <Border Grid.Row="0" x:Name="DropArea"
                             Background="#1E293B" BorderBrush="#6366F1" BorderThickness="2" CornerRadius="12"
-                            Padding="20" Margin="0,0,0,12"
+                            Padding="18" Margin="0,0,0,12"
                             AllowDrop="True" Drop="DropArea_Drop" DragEnter="DropArea_DragEnter" DragLeave="DropArea_DragLeave"
                             Cursor="Hand" MouseLeftButtonDown="BtnSelectFile_Click">
                         <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
-                            <Border Width="48" Height="48" Background="#312E81" CornerRadius="24" HorizontalAlignment="Center" Margin="0,0,0,10">
-                                <TextBlock Text="📁" FontSize="22" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                            <Border x:Name="DropIconBadge" Width="44" Height="44" Background="#312E81" CornerRadius="22" HorizontalAlignment="Center" Margin="0,0,0,8">
+                                <TextBlock Text="📁" FontSize="20" HorizontalAlignment="Center" VerticalAlignment="Center" />
                             </Border>
-                            <TextBlock Text="Faylni bu yerga tashlang" Foreground="#F8FAFC" FontWeight="Bold" FontSize="14" HorizontalAlignment="Center" />
-                            <TextBlock Text="PDF, Word, Excel, PPTX, Rasm (OCR), Audio, ZIP, Kod" Foreground="#94A3B8" FontSize="11" TextWrapping="Wrap" TextAlignment="Center" Margin="0,4,0,10" />
-                            <Button Click="BtnSelectFile_Click" Style="{StaticResource AccentButton}" Content="Fayl Tanlash..." HorizontalAlignment="Center" Padding="16,6" FontSize="12" />
+                            <TextBlock Text="Faylni bu yerga tashlang" Foreground="#F8FAFC" FontWeight="Bold" FontSize="13" HorizontalAlignment="Center" />
+                            <TextBlock Text="PDF, Word, Excel, PPTX, Rasm (OCR), Audio, ZIP, Kod" Foreground="#94A3B8" FontSize="11" TextWrapping="Wrap" TextAlignment="Center" Margin="0,3,0,8" />
+                            <Button Click="BtnSelectFile_Click" Style="{StaticResource AccentButton}" Content="Fayl Tanlash..." HorizontalAlignment="Center" Padding="14,5" FontSize="11" />
                         </StackPanel>
                     </Border>
 
                     <!-- Web URL Converter Box -->
-                    <Border Grid.Row="1" Background="#1E293B" BorderBrush="#334155" BorderThickness="1" CornerRadius="10" Padding="10" Margin="0,0,0,12">
+                    <Border x:Name="UrlBoxBorder" Grid.Row="1" Background="#1E293B" BorderBrush="#334155" BorderThickness="1" CornerRadius="10" Padding="10" Margin="0,0,0,12">
                         <Grid>
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="*" />
@@ -165,7 +176,7 @@
                     </Border>
 
                     <!-- Converted Items History -->
-                    <Border Grid.Row="2" Background="#1E293B" BorderBrush="#334155" BorderThickness="1" CornerRadius="10" Padding="10">
+                    <Border x:Name="HistoryBoxBorder" Grid.Row="2" Background="#1E293B" BorderBrush="#334155" BorderThickness="1" CornerRadius="10" Padding="10">
                         <Grid>
                             <Grid.RowDefinitions>
                                 <RowDefinition Height="Auto" />
@@ -207,7 +218,7 @@
                 <GridSplitter Grid.Column="1" Width="4" HorizontalAlignment="Center" Background="#334155" Cursor="SizeWE" />
 
                 <!-- RIGHT PANEL: Markdown Viewer & Editor -->
-                <Border Grid.Column="2" Background="#1E293B" BorderBrush="#334155" BorderThickness="1" CornerRadius="12" Padding="14">
+                <Border x:Name="EditorContainerBorder" Grid.Column="2" Background="#1E293B" BorderBrush="#334155" BorderThickness="1" CornerRadius="12" Padding="14">
                     <Grid>
                         <Grid.RowDefinitions>
                             <RowDefinition Height="Auto" /> <!-- Doc Header & Action Toolbar -->
@@ -222,8 +233,8 @@
                             </Grid.ColumnDefinitions>
 
                             <StackPanel Grid.Column="0" VerticalAlignment="Center">
-                                <TextBlock x:Name="TxtDocTitle" Text="MarkItDown Studio .NET ga Xush Kelibsiz" Foreground="#F8FAFC" FontWeight="Bold" FontSize="15" />
-                                <TextBlock x:Name="TxtDocStats" Text="Fayl yuklang yoki chap tarafdagi maydonga tashlang" Foreground="#94A3B8" FontSize="11" Margin="0,2,0,0" />
+                                <TextBlock x:Name="TxtDocTitle" Text="MarkItDown Studio .NET" Foreground="#F8FAFC" FontWeight="Bold" FontSize="15" />
+                                <TextBlock x:Name="TxtDocStats" Text="Obsidian va Markdown uchun toza, tartibli formatlash" Foreground="#94A3B8" FontSize="11" Margin="0,2,0,0" />
                             </StackPanel>
 
                             <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
@@ -233,7 +244,7 @@
                         </Grid>
 
                         <!-- Markdown Text Area -->
-                        <Border Grid.Row="1" Background="#0B1120" BorderBrush="#334155" BorderThickness="1" CornerRadius="10" Padding="10">
+                        <Border x:Name="EditorInnerBorder" Grid.Row="1" Background="#0B1120" BorderBrush="#334155" BorderThickness="1" CornerRadius="10" Padding="10">
                             <TextBox x:Name="TxtMarkdownEditor"
                                      Background="Transparent" Foreground="#E2E8F0" BorderThickness="0"
                                      FontFamily="Consolas, Cascadia Code, Segoe UI" FontSize="13"
@@ -246,14 +257,14 @@
             </Grid>
 
             <!-- 4. Footer Status Bar -->
-            <Border Grid.Row="3" Background="#0F172A" CornerRadius="0,0,15,15" BorderBrush="#334155" BorderThickness="0,1,0,0" Padding="14,0">
+            <Border x:Name="FooterBorder" Grid.Row="3" Background="#0F172A" CornerRadius="0,0,15,15" BorderBrush="#334155" BorderThickness="0,1,0,0" Padding="14,0">
                 <Grid VerticalAlignment="Center">
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="*" />
                         <ColumnDefinition Width="Auto" />
                     </Grid.ColumnDefinitions>
                     <TextBlock x:Name="TxtStatus" Grid.Column="0" Text="Tayyor. PDF, Word, Excel, PPTX, Rasm yoki Audio yuklang." Foreground="#94A3B8" FontSize="11" />
-                    <TextBlock Grid.Column="1" Text="100% C# .NET 10 Core Engine • Microsoft MarkItDown Integration" Foreground="#64748B" FontSize="11" />
+                    <TextBlock Grid.Column="1" Text="Obsidian Markdown Architecture • 100% C# .NET 10" Foreground="#64748B" FontSize="11" />
                 </Grid>
             </Border>
         </Grid>

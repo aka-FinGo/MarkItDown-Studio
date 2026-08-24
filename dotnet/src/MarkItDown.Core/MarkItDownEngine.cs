@@ -23,9 +23,9 @@ public class MarkItDownEngine
         _aiClient = aiClient ?? new UniversalAiClient();
         _httpClient = httpClient ?? new HttpClient { Timeout = TimeSpan.FromMinutes(2) };
         _pdfConverter = new PdfConverter(_aiClient);
-        _wordConverter = new WordConverter();
+        _wordConverter = new WordConverter(_aiClient);
         _excelConverter = new ExcelConverter();
-        _powerPointConverter = new PowerPointConverter();
+        _powerPointConverter = new PowerPointConverter(_aiClient);
         _htmlConverter = new HtmlConverter();
         _codeTextConverter = new CodeTextConverter();
     }
@@ -42,13 +42,15 @@ public class MarkItDownEngine
         }
 
         var fileName = Path.GetFileName(filePath);
+        var outputDirectory = Path.GetDirectoryName(filePath);
         var bytes = await File.ReadAllBytesAsync(filePath, ct);
-        return await ConvertBytesAsync(bytes, fileName, options, aiConfig, ct);
+        return await ConvertBytesAsync(bytes, fileName, outputDirectory, options, aiConfig, ct);
     }
 
     public async Task<List<ConversionResult>> ConvertBytesAsync(
         byte[] fileBytes,
         string fileName,
+        string? outputDirectory = null,
         ConversionOptions? options = null,
         AiProviderConfig? aiConfig = null,
         CancellationToken ct = default)
@@ -64,7 +66,7 @@ public class MarkItDownEngine
         {
             foreach (var (entryName, data) in ZipConverter.ExtractEntries(fileBytes))
             {
-                var entryResults = await ConvertBytesAsync(data, entryName, options, aiConfig, ct);
+                var entryResults = await ConvertBytesAsync(data, entryName, outputDirectory, options, aiConfig, ct);
                 results.AddRange(entryResults);
             }
             return results;
@@ -74,71 +76,98 @@ public class MarkItDownEngine
         var usedAi = false;
         var tokensConsumed = 0;
         var engineName = "MarkItDown .NET Local";
-
         var isImageOrAudio = IsImageOrAudio(ext);
+        var hasApiKey = options.EnableAi && aiConfig != null && !string.IsNullOrWhiteSpace(aiConfig.ApiKey);
 
-        // If Image / Audio -> Direct AI Multimodal
+        // 1. Image / Audio Handling
         if (isImageOrAudio)
         {
-            if (options.EnableAi && aiConfig != null && !string.IsNullOrWhiteSpace(aiConfig.ApiKey))
+            var isAudio = ext is "mp3" or "wav" or "m4a" or "ogg" or "flac";
+            if (hasApiKey && aiConfig != null)
             {
                 usedAi = true;
-                engineName = $"{aiConfig.Provider} Multimodal AI ({aiConfig.ModelName})";
+                engineName = $"{aiConfig.Provider} ({aiConfig.ModelName})";
                 var mime = GetMimeType(ext);
                 var aiRes = await _aiClient.ConvertWithAiAsync(fileBytes, mime, fileName, aiConfig, options.CustomPrompt, ct);
-                markdown = aiRes.Markdown;
                 tokensConsumed = aiRes.TokensConsumed;
+
+                var imgSb = new StringBuilder();
+                imgSb.AppendLine($"# 📄 {Path.GetFileNameWithoutExtension(fileName)}");
+                imgSb.AppendLine();
+                imgSb.AppendLine($"> 📌 **{(isAudio ? "Audio" : "Tasvir")}:** `{fileName}` | **Format:** {ext.ToUpperInvariant()}");
+                imgSb.AppendLine();
+
+                if (!isAudio)
+                {
+                    imgSb.AppendLine($"![{fileName}]({fileName})");
+                    imgSb.AppendLine();
+                }
+
+                imgSb.AppendLine($"> 🤖 **[AI OCR / {(isAudio ? "Audio Transkripsiya" : "Tasvir Tahlili")}]** *(Ushbu qism `{aiConfig.Provider}` - `{aiConfig.ModelName}` modeli yordamida tayyorlandi, tekshirib ko'ring)*:\n>\n" + IndentQuote(aiRes.Markdown));
+                markdown = imgSb.ToString().Trim();
             }
             else
             {
-                markdown = $"> **[Tasvir/Audio Fayli]:** \"{fileName}\"\n>\n> *Ushbu formatdan matn ajratish (OCR / Transkripsiya) uchun yuqoridagi 'AI Sozlamalari' bo'limida API kalitni kiriting.*";
+                var imgSb = new StringBuilder();
+                imgSb.AppendLine($"# 📄 {Path.GetFileNameWithoutExtension(fileName)}");
+                imgSb.AppendLine();
+                imgSb.AppendLine($"> 📌 **{(isAudio ? "Audio" : "Tasvir")}:** `{fileName}` | **Format:** {ext.ToUpperInvariant()}");
+                imgSb.AppendLine();
+                if (!isAudio)
+                {
+                    imgSb.AppendLine($"![{fileName}]({fileName})");
+                    imgSb.AppendLine();
+                }
+                imgSb.AppendLine($"> ⚠️ *(Ushbu rasm/audio yuklandi. AI API kaliti ulanmagani sababli matn ajratib olinmadi)*");
+                markdown = imgSb.ToString().Trim();
             }
         }
         else
         {
+            // 2. Documents
             try
             {
                 switch (ext)
                 {
                     case "pdf":
-                        markdown = await _pdfConverter.ConvertAsync(fileBytes, fileName, options, aiConfig, ct);
+                        markdown = await _pdfConverter.ConvertAsync(fileBytes, fileName, outputDirectory, options, aiConfig, ct);
                         break;
                     case "docx" or "doc":
-                        markdown = await _wordConverter.ConvertAsync(fileBytes, ct);
+                        markdown = await _wordConverter.ConvertAsync(fileBytes, fileName, outputDirectory, options, aiConfig, ct);
                         break;
                     case "pptx" or "ppt":
-                        markdown = await _powerPointConverter.ConvertAsync(fileBytes, ct);
+                        markdown = await _powerPointConverter.ConvertAsync(fileBytes, fileName, outputDirectory, options, aiConfig, ct);
                         break;
                     case "xlsx" or "xls" or "ods":
-                        markdown = await _excelConverter.ConvertAsync(fileBytes, ct);
+                        markdown = await _excelConverter.ConvertAsync(fileBytes, fileName, ct);
                         break;
                     case "csv":
-                        markdown = _codeTextConverter.ConvertCsv(Encoding.UTF8.GetString(fileBytes), ",");
+                        markdown = FormatTextDocument(fileName, ext, _codeTextConverter.ConvertCsv(Encoding.UTF8.GetString(fileBytes), ","));
                         break;
                     case "tsv":
-                        markdown = _codeTextConverter.ConvertCsv(Encoding.UTF8.GetString(fileBytes), "\t");
+                        markdown = FormatTextDocument(fileName, ext, _codeTextConverter.ConvertCsv(Encoding.UTF8.GetString(fileBytes), "\t"));
                         break;
                     case "json":
-                        markdown = _codeTextConverter.ConvertJson(Encoding.UTF8.GetString(fileBytes));
+                        markdown = FormatTextDocument(fileName, ext, _codeTextConverter.ConvertJson(Encoding.UTF8.GetString(fileBytes)));
                         break;
                     case "html" or "htm":
-                        markdown = _htmlConverter.Convert(Encoding.UTF8.GetString(fileBytes));
+                        markdown = FormatTextDocument(fileName, ext, _htmlConverter.Convert(Encoding.UTF8.GetString(fileBytes)));
                         break;
                     default:
                         var text = Encoding.UTF8.GetString(fileBytes);
-                        markdown = _codeTextConverter.ConvertCode(text, ext);
+                        markdown = FormatTextDocument(fileName, ext, _codeTextConverter.ConvertCode(text, ext));
                         break;
                 }
             }
             catch (Exception ex)
             {
-                if (options.EnableAi && aiConfig != null && !string.IsNullOrWhiteSpace(aiConfig.ApiKey))
+                if (hasApiKey && aiConfig != null)
                 {
                     usedAi = true;
                     engineName = $"{aiConfig.Provider} AI Fallback";
                     var mime = GetMimeType(ext);
                     var aiRes = await _aiClient.ConvertWithAiAsync(fileBytes, mime, fileName, aiConfig, options.CustomPrompt, ct);
-                    markdown = aiRes.Markdown;
+                    markdown = FormatTextDocument(fileName, ext, aiRes.Markdown);
                     tokensConsumed = aiRes.TokensConsumed;
                 }
                 else
@@ -146,35 +175,6 @@ public class MarkItDownEngine
                     throw new InvalidOperationException($"\"{fileName}\" faylini o'girishda xatolik: {ex.Message}", ex);
                 }
             }
-        }
-
-        // Add YAML Frontmatter if enabled
-        Dictionary<string, object>? frontmatter = null;
-        if (options.IncludeFrontmatter)
-        {
-            var wCount = CountWords(markdown);
-            var tokEst = EstimateTokens(markdown);
-            frontmatter = new Dictionary<string, object>
-            {
-                ["sarlavha"] = Path.GetFileNameWithoutExtension(fileName),
-                ["fayl_nomi"] = fileName,
-                ["format"] = ext.ToUpperInvariant(),
-                ["vaqt"] = DateTime.UtcNow.ToString("o"),
-                ["dvigatel"] = engineName,
-                ["ai_token_sarfi"] = tokensConsumed,
-                ["sozlar_soni"] = wCount,
-                ["taxminiy_tokenlar"] = tokEst
-            };
-
-            var yamlSb = new StringBuilder();
-            yamlSb.AppendLine("---");
-            foreach (var kvp in frontmatter)
-            {
-                yamlSb.AppendLine($"{kvp.Key}: {(kvp.Value is string s ? $"\"{s}\"" : kvp.Value)}");
-            }
-            yamlSb.AppendLine("---");
-            yamlSb.AppendLine();
-            markdown = yamlSb + markdown;
         }
 
         sw.Stop();
@@ -193,7 +193,6 @@ public class MarkItDownEngine
             UsedAi = usedAi,
             TokensConsumed = tokensConsumed,
             EngineName = engineName,
-            Frontmatter = frontmatter,
             IsSuccess = true
         });
 
@@ -216,7 +215,6 @@ public class MarkItDownEngine
 
         try
         {
-            // Try Jina Reader first
             using var jinaReq = new HttpRequestMessage(HttpMethod.Get, $"https://r.jina.ai/{url}");
             jinaReq.Headers.Add("Accept", "text/markdown");
             var jinaRes = await _httpClient.SendAsync(jinaReq, ct);
@@ -232,7 +230,6 @@ public class MarkItDownEngine
             }
             else
             {
-                // Fallback to direct HTML
                 using var req = new HttpRequestMessage(HttpMethod.Get, url);
                 req.Headers.Add("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64)");
                 var res = await _httpClient.SendAsync(req, ct);
@@ -248,13 +245,7 @@ public class MarkItDownEngine
             throw new InvalidOperationException($"Web havolani o'qib bo'lmadi: {ex.Message}", ex);
         }
 
-        if (options.IncludeFrontmatter)
-        {
-            var wCount = CountWords(markdown);
-            var tokEst = EstimateTokens(markdown);
-            var yaml = $"---\ntitle: \"{title}\"\nsource_url: \"{url}\"\nconverted_at: \"{DateTime.UtcNow:o}\"\nword_count: {wCount}\n---\n\n";
-            markdown = yaml + markdown;
-        }
+        var obsidianUrlMd = $"# 🌐 {title}\n\n> 📌 **Manba:** [{url}]({url})\n\n---\n\n{markdown.Trim()}";
 
         sw.Stop();
 
@@ -262,12 +253,12 @@ public class MarkItDownEngine
         {
             FileName = title,
             OriginalFormat = "URL",
-            OriginalSizeBytes = Encoding.UTF8.GetByteCount(markdown),
-            Markdown = markdown,
-            WordCount = CountWords(markdown),
-            CharCount = markdown.Length,
-            LineCount = markdown.Split('\n').Length,
-            EstimatedTokens = EstimateTokens(markdown),
+            OriginalSizeBytes = Encoding.UTF8.GetByteCount(obsidianUrlMd),
+            Markdown = obsidianUrlMd,
+            WordCount = CountWords(obsidianUrlMd),
+            CharCount = obsidianUrlMd.Length,
+            LineCount = obsidianUrlMd.Split('\n').Length,
+            EstimatedTokens = EstimateTokens(obsidianUrlMd),
             DurationMs = sw.ElapsedMilliseconds,
             UsedAi = usedAi,
             TokensConsumed = tokensConsumed,
@@ -275,6 +266,30 @@ public class MarkItDownEngine
             EngineName = "MarkItDown .NET Web Reader",
             IsSuccess = true
         };
+    }
+
+    private static string FormatTextDocument(string fileName, string format, string body)
+    {
+        var sb = new StringBuilder();
+        sb.AppendLine($"# 📄 {Path.GetFileNameWithoutExtension(fileName)}");
+        sb.AppendLine();
+        sb.AppendLine($"> 📌 **Hujjat:** `{fileName}` | **Format:** {format.ToUpperInvariant()}");
+        sb.AppendLine();
+        sb.AppendLine("---");
+        sb.AppendLine();
+        sb.AppendLine(body.Trim());
+        return sb.ToString().Trim();
+    }
+
+    private static string IndentQuote(string text)
+    {
+        var lines = text.Split('\n');
+        var sb = new StringBuilder();
+        foreach (var line in lines)
+        {
+            sb.AppendLine($"> {line}");
+        }
+        return sb.ToString().TrimEnd();
     }
 
     public static int CountWords(string text)
@@ -300,6 +315,7 @@ public class MarkItDownEngine
         "webp" => "image/webp",
         "gif" => "image/gif",
         "svg" => "image/svg+xml",
+        "bmp" => "image/bmp",
         "pdf" => "application/pdf",
         "mp3" => "audio/mp3",
         "wav" => "audio/wav",

@@ -13,41 +13,101 @@ namespace MarkItDown.App;
 public partial class MainWindow : Window
 {
     private readonly MarkItDownEngine _engine;
+    private readonly AppConfig _config;
     public ObservableCollection<ConversionResult> ConvertedItems { get; } = new();
     private ConversionResult? _activeResult;
-    private string? _customPrompt;
+    private bool _isInitializing = true;
 
     public MainWindow()
     {
         InitializeComponent();
         _engine = new MarkItDownEngine();
+        _config = AppConfig.Load();
         LstConvertedItems.ItemsSource = ConvertedItems;
 
-        PopulateModelNames(AiProvider.GoogleGemini);
+        LoadSavedSettings();
+        _isInitializing = false;
         LoadDefaultSample();
+    }
+
+    private void LoadSavedSettings()
+    {
+        // 1. Theme
+        foreach (ComboBoxItem item in CmbTheme.Items)
+        {
+            if (item.Tag?.ToString() == _config.Theme)
+            {
+                CmbTheme.SelectedItem = item;
+                ApplyTheme(_config.Theme);
+                break;
+            }
+        }
+
+        // 2. Provider
+        foreach (ComboBoxItem item in CmbAiProvider.Items)
+        {
+            if (item.Tag?.ToString() == _config.SelectedProvider.ToString())
+            {
+                CmbAiProvider.SelectedItem = item;
+                break;
+            }
+        }
+
+        PopulateModelNames(_config.SelectedProvider);
+
+        // 3. Model
+        if (!string.IsNullOrEmpty(_config.SelectedModel))
+        {
+            CmbModelName.Text = _config.SelectedModel;
+        }
+
+        // 4. API Key
+        var savedKey = _config.GetApiKey(_config.SelectedProvider);
+        if (!string.IsNullOrEmpty(savedKey))
+        {
+            TxtApiKey.Password = savedKey;
+            TxtKeyStatus.Text = "🔒 Kalit saqlangan";
+            TxtKeyStatus.Foreground = new SolidColorBrush(Color.FromRgb(16, 185, 129));
+        }
+        else
+        {
+            TxtKeyStatus.Text = "⚠️ Kalit kiritilmagan";
+            TxtKeyStatus.Foreground = new SolidColorBrush(Color.FromRgb(245, 158, 11));
+        }
+
+        // 5. Custom URL & AI switch
+        TxtCustomBaseUrl.Text = _config.CustomBaseUrl ?? "http://localhost:11434";
+        ChkEnableAi.IsChecked = _config.EnableAi;
     }
 
     private void LoadDefaultSample()
     {
-        var welcomeMd = @"# MarkItDown Studio .NET ga Xush Kelibsiz! 🚀
+        var welcomeMd = @"# 📄 MarkItDown Studio .NET ga Xush Kelibsiz! 🚀
 
-Ushbu dastur **Microsoft MarkItDown** va **MarkItDown Studio** loyihalarini C# (.NET) da mukammal birlashtirgan universal konverterdir.
+> 📌 **Hujjat:** `Namuna_Qollanma.md` | **Tizim:** Obsidian & Multi-AI Moslashuvchan Dvigatel
 
----
-
-### 🌟 Asosiy Imkoniyatlar:
-- **PDF (.pdf):** Matnli va skanerlangan (OCR) PDF fayllarni to'liq o'qish (bo'sh sahifa chiqmaydi!).
-- **Word (.docx):** Sarlavhalar, jadvallar va ro'yxatlarni toza Markdown ga o'girish.
-- **Excel (.xlsx, .xls, .csv):** Barcha sahifalarni toza GFM Markdown jadvaliga aylantirish.
-- **PowerPoint (.pptx):** Slaydlar va taqdimot matnlarini tartibli ajratish.
-- **Rasm (OCR) & Audio:** Google Gemini, OpenAI, Claude, DeepSeek, Ollama orqali matnga o'girish.
-- **ZIP Arxivlar:** Arxiv ichidagi barcha fayllarni birvarakayiga konvertatsiya qilish.
-- **Web Havolalar (URL):** Web maqolalarni to'g'ridan-to'g'ri toza Markdown ga aylantirish.
+## 📑 Mundarija
+- [[#1. Imkoniyatlar|1. Imkoniyatlar]]
+- [[#2. Obsidian Mosligi|2. Obsidian Mosligi]]
+- [[#3. Rasmlarni Boshqarish|3. Rasmlarni Boshqarish]]
+- [[#4. AI Provayderlar|4. AI Provayderlar]]
 
 ---
 
-### 💡 Boshlash uchun:
-Chap tarafdagi maydonga faylingizni tashlang yoki **'Fayl Tanlash'** tugmasini bosing!
+## 1. Imkoniyatlar
+- **PDF, Word (.docx), Excel (.xlsx), PowerPoint (.pptx), CSV, JSON, HTML, Kod va ZIP** fayllarni 100% toza matnga o'girish.
+- Hech qanday ortiqcha axlat matnlarsiz, hujjatdagi asl tartib saqlanadi.
+
+## 2. Obsidian Mosligi
+- Hujjatlar Obsidian da ochilganda avtomatik Mundarija linklari (`[[#Sahifa 1]]`), chiroyli callout bloklari (`> [!NOTE]`) va jadvallar bilan ko'rinadi.
+
+## 3. Rasmlarni Boshqarish
+- Hujjat ichidagi barcha tasvirlar avtomatik alohida `{hujjat_nomi}_attachments/` papkasiga saqlanadi.
+- Agar API kalit ulangan bo'lsa, har bir rasm sun'iy intellekt orqali to'liq matnga o'girilib kiritiladi!
+
+## 4. AI Provayderlar
+- **Google Gemini**, **OpenAI (GPT-4o)**, **Anthropic Claude**, **DeepSeek**, **Ollama (Lokal)** yoki **Custom Endpoint**!
+- Barcha API kalitlaringiz shaxsiy kompyuteringizda xavfsiz shifrlanib saqlanadi.
 ";
         TxtMarkdownEditor.Text = welcomeMd;
     }
@@ -55,10 +115,7 @@ Chap tarafdagi maydonga faylingizni tashlang yoki **'Fayl Tanlash'** tugmasini b
     // Title Bar Drag & Window Controls
     private void TitleBar_MouseDown(object sender, MouseButtonEventArgs e)
     {
-        if (e.ChangedButton == MouseButton.Left)
-        {
-            DragMove();
-        }
+        if (e.ChangedButton == MouseButton.Left) DragMove();
     }
 
     private void BtnMinimize_Click(object sender, RoutedEventArgs e) => WindowState = WindowState.Minimized;
@@ -69,6 +126,89 @@ Chap tarafdagi maydonga faylingizni tashlang yoki **'Fayl Tanlash'** tugmasini b
     }
 
     private void BtnClose_Click(object sender, RoutedEventArgs e) => Close();
+
+    // Theme Switcher
+    private void CmbTheme_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (CmbTheme.SelectedItem is ComboBoxItem item)
+        {
+            var theme = item.Tag?.ToString() ?? "MidnightGlass";
+            ApplyTheme(theme);
+            if (!_isInitializing)
+            {
+                _config.Theme = theme;
+                _config.Save();
+            }
+        }
+    }
+
+    private void ApplyTheme(string theme)
+    {
+        switch (theme)
+        {
+            case "ObsidianDark":
+                MainBorder.Background = new SolidColorBrush(Color.FromRgb(20, 20, 20));
+                MainBorder.BorderBrush = new SolidColorBrush(Color.FromRgb(50, 50, 50));
+                TitleBarBorder.Background = new SolidColorBrush(Color.FromRgb(28, 28, 28));
+                SettingsBarBorder.Background = new SolidColorBrush(Color.FromRgb(24, 24, 24));
+                DropArea.Background = new SolidColorBrush(Color.FromRgb(30, 30, 30));
+                DropArea.BorderBrush = new SolidColorBrush(Color.FromRgb(168, 85, 247));
+                DropIconBadge.Background = new SolidColorBrush(Color.FromRgb(88, 28, 135));
+                LogoBadge.Background = new SolidColorBrush(Color.FromRgb(168, 85, 247));
+                EditorContainerBorder.Background = new SolidColorBrush(Color.FromRgb(24, 24, 24));
+                EditorInnerBorder.Background = new SolidColorBrush(Color.FromRgb(16, 16, 16));
+                FooterBorder.Background = new SolidColorBrush(Color.FromRgb(20, 20, 20));
+                break;
+
+            case "CyberpunkNeon":
+                MainBorder.Background = new SolidColorBrush(Color.FromRgb(5, 8, 17));
+                MainBorder.BorderBrush = new SolidColorBrush(Color.FromRgb(6, 182, 212));
+                TitleBarBorder.Background = new SolidColorBrush(Color.FromRgb(10, 15, 30));
+                SettingsBarBorder.Background = new SolidColorBrush(Color.FromRgb(8, 12, 24));
+                DropArea.Background = new SolidColorBrush(Color.FromRgb(15, 23, 42));
+                DropArea.BorderBrush = new SolidColorBrush(Color.FromRgb(6, 182, 212));
+                DropIconBadge.Background = new SolidColorBrush(Color.FromRgb(8, 145, 178));
+                LogoBadge.Background = new SolidColorBrush(Color.FromRgb(6, 182, 212));
+                EditorContainerBorder.Background = new SolidColorBrush(Color.FromRgb(15, 23, 42));
+                EditorInnerBorder.Background = new SolidColorBrush(Color.FromRgb(2, 6, 23));
+                FooterBorder.Background = new SolidColorBrush(Color.FromRgb(5, 8, 17));
+                break;
+
+            case "FrostedCrystal":
+                MainBorder.Background = new SolidColorBrush(Color.FromRgb(241, 245, 249));
+                MainBorder.BorderBrush = new SolidColorBrush(Color.FromRgb(203, 213, 225));
+                TitleBarBorder.Background = new SolidColorBrush(Color.FromRgb(255, 255, 255));
+                SettingsBarBorder.Background = new SolidColorBrush(Color.FromRgb(248, 250, 252));
+                DropArea.Background = new SolidColorBrush(Color.FromRgb(255, 255, 255));
+                DropArea.BorderBrush = new SolidColorBrush(Color.FromRgb(59, 130, 246));
+                DropIconBadge.Background = new SolidColorBrush(Color.FromRgb(219, 234, 254));
+                LogoBadge.Background = new SolidColorBrush(Color.FromRgb(59, 130, 246));
+                EditorContainerBorder.Background = new SolidColorBrush(Color.FromRgb(255, 255, 255));
+                EditorInnerBorder.Background = new SolidColorBrush(Color.FromRgb(248, 250, 252));
+                FooterBorder.Background = new SolidColorBrush(Color.FromRgb(241, 245, 249));
+                TxtAppTitle.Foreground = new SolidColorBrush(Color.FromRgb(15, 23, 42));
+                TxtDocTitle.Foreground = new SolidColorBrush(Color.FromRgb(15, 23, 42));
+                TxtMarkdownEditor.Foreground = new SolidColorBrush(Color.FromRgb(30, 41, 59));
+                break;
+
+            default: // MidnightGlass
+                MainBorder.Background = new SolidColorBrush(Color.FromRgb(15, 23, 42));
+                MainBorder.BorderBrush = new SolidColorBrush(Color.FromRgb(51, 65, 85));
+                TitleBarBorder.Background = new SolidColorBrush(Color.FromRgb(30, 41, 59));
+                SettingsBarBorder.Background = new SolidColorBrush(Color.FromRgb(22, 32, 50));
+                DropArea.Background = new SolidColorBrush(Color.FromRgb(30, 41, 59));
+                DropArea.BorderBrush = new SolidColorBrush(Color.FromRgb(99, 102, 241));
+                DropIconBadge.Background = new SolidColorBrush(Color.FromRgb(49, 46, 129));
+                LogoBadge.Background = new SolidColorBrush(Color.FromRgb(99, 102, 241));
+                EditorContainerBorder.Background = new SolidColorBrush(Color.FromRgb(30, 41, 59));
+                EditorInnerBorder.Background = new SolidColorBrush(Color.FromRgb(11, 17, 32));
+                FooterBorder.Background = new SolidColorBrush(Color.FromRgb(15, 23, 42));
+                TxtAppTitle.Foreground = new SolidColorBrush(Color.FromRgb(248, 250, 252));
+                TxtDocTitle.Foreground = new SolidColorBrush(Color.FromRgb(248, 250, 252));
+                TxtMarkdownEditor.Foreground = new SolidColorBrush(Color.FromRgb(226, 232, 240));
+                break;
+        }
+    }
 
     // AI Provider Switcher
     private void CmbAiProvider_SelectionChanged(object sender, SelectionChangedEventArgs e)
@@ -82,6 +222,17 @@ Chap tarafdagi maydonga faylingizni tashlang yoki **'Fayl Tanlash'** tugmasini b
                 PnlCustomBaseUrl.Visibility = (provider == AiProvider.Ollama || provider == AiProvider.CustomOpenAICompatible)
                     ? Visibility.Visible
                     : Visibility.Collapsed;
+            }
+
+            // Restore saved API key for this provider
+            var key = _config.GetApiKey(provider);
+            TxtApiKey.Password = key;
+            UpdateKeyStatus(key);
+
+            if (!_isInitializing)
+            {
+                _config.SelectedProvider = provider;
+                _config.Save();
             }
         }
     }
@@ -101,14 +252,62 @@ Chap tarafdagi maydonga faylingizni tashlang yoki **'Fayl Tanlash'** tugmasini b
         }
     }
 
-    private AiProviderConfig GetCurrentAiConfig()
+    private void TxtApiKey_PasswordChanged(object sender, RoutedEventArgs e)
     {
-        var provider = AiProvider.GoogleGemini;
+        if (_isInitializing) return;
+        var key = TxtApiKey.Password?.Trim() ?? string.Empty;
+        var provider = GetSelectedProvider();
+        _config.SetApiKey(provider, key);
+        UpdateKeyStatus(key);
+    }
+
+    private void CmbModelName_LostFocus(object sender, RoutedEventArgs e)
+    {
+        if (_isInitializing) return;
+        _config.SelectedModel = CmbModelName.Text?.Trim() ?? "gemini-2.5-flash";
+        _config.Save();
+    }
+
+    private void TxtCustomBaseUrl_LostFocus(object sender, RoutedEventArgs e)
+    {
+        if (_isInitializing) return;
+        _config.CustomBaseUrl = TxtCustomBaseUrl.Text?.Trim();
+        _config.Save();
+    }
+
+    private void ChkEnableAi_Changed(object sender, RoutedEventArgs e)
+    {
+        if (_isInitializing) return;
+        _config.EnableAi = ChkEnableAi.IsChecked == true;
+        _config.Save();
+    }
+
+    private void UpdateKeyStatus(string key)
+    {
+        if (!string.IsNullOrEmpty(key))
+        {
+            TxtKeyStatus.Text = "🔒 Kalit saqlandi";
+            TxtKeyStatus.Foreground = new SolidColorBrush(Color.FromRgb(16, 185, 129));
+        }
+        else
+        {
+            TxtKeyStatus.Text = "⚠️ Kalit kiritilmagan";
+            TxtKeyStatus.Foreground = new SolidColorBrush(Color.FromRgb(245, 158, 11));
+        }
+    }
+
+    private AiProvider GetSelectedProvider()
+    {
         if (CmbAiProvider.SelectedItem is ComboBoxItem item && Enum.TryParse<AiProvider>(item.Tag?.ToString(), out var p))
         {
-            provider = p;
+            return p;
         }
+        return AiProvider.GoogleGemini;
+    }
 
+    private AiProviderConfig GetCurrentAiConfig()
+    {
+        var provider = GetSelectedProvider();
         return new AiProviderConfig
         {
             Provider = provider,
@@ -123,26 +322,24 @@ Chap tarafdagi maydonga faylingizni tashlang yoki **'Fayl Tanlash'** tugmasini b
         return new ConversionOptions
         {
             EnableAi = ChkEnableAi.IsChecked == true,
-            IncludeFrontmatter = ChkFrontmatter.IsChecked == true,
-            CustomPrompt = _customPrompt,
+            IncludeFrontmatter = false,
+            CustomPrompt = _config.CustomPrompt,
             AutoOcrScannedPdf = true
         };
     }
 
-    // Drag and Drop Handlers
+    // Drag and Drop
     private void DropArea_DragEnter(object sender, DragEventArgs e)
     {
         if (e.Data.GetDataPresent(DataFormats.FileDrop))
         {
             DropArea.BorderBrush = new SolidColorBrush(Color.FromRgb(129, 140, 248));
-            DropArea.Background = new SolidColorBrush(Color.FromArgb(200, 49, 46, 129));
         }
     }
 
     private void DropArea_DragLeave(object sender, DragEventArgs e)
     {
         DropArea.BorderBrush = new SolidColorBrush(Color.FromRgb(99, 102, 241));
-        DropArea.Background = new SolidColorBrush(Color.FromRgb(30, 41, 59));
     }
 
     private async void DropArea_Drop(object sender, DragEventArgs e)
@@ -158,7 +355,6 @@ Chap tarafdagi maydonga faylingizni tashlang yoki **'Fayl Tanlash'** tugmasini b
         }
     }
 
-    // Select File Button
     private async void BtnSelectFile_Click(object sender, RoutedEventArgs e)
     {
         var dlg = new OpenFileDialog
@@ -174,7 +370,6 @@ Chap tarafdagi maydonga faylingizni tashlang yoki **'Fayl Tanlash'** tugmasini b
         }
     }
 
-    // Process Files
     private async Task ProcessFilesAsync(string[] filePaths)
     {
         var options = GetCurrentOptions();
@@ -206,7 +401,6 @@ Chap tarafdagi maydonga faylingizni tashlang yoki **'Fayl Tanlash'** tugmasini b
         TxtStatus.Text = "Barcha fayllar muvaffaqiyatli o'girildi!";
     }
 
-    // Convert URL
     private async void BtnConvertUrl_Click(object sender, RoutedEventArgs e)
     {
         var url = TxtWebUrl.Text.Trim();
@@ -281,7 +475,7 @@ Chap tarafdagi maydonga faylingizni tashlang yoki **'Fayl Tanlash'** tugmasini b
         {
             FileName = defaultName,
             DefaultExt = ".md",
-            Filter = "Markdown Hujjati (*.md)|*.md|Matn Hujjati (*.txt)|*.txt|Barcha Fayllar (*.*)|*.*"
+            Filter = "Obsidian / Markdown Hujjati (*.md)|*.md|Matn Hujjati (*.txt)|*.txt|Barcha Fayllar (*.*)|*.*"
         };
 
         if (dlg.ShowDialog() == true)

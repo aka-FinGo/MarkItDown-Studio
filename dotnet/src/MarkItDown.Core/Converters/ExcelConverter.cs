@@ -8,11 +8,10 @@ public class ExcelConverter
 {
     static ExcelConverter()
     {
-        // Required for ExcelDataReader encoding support
         Encoding.RegisterProvider(CodePagesEncodingProvider.Instance);
     }
 
-    public Task<string> ConvertAsync(byte[] excelBytes, CancellationToken ct = default)
+    public Task<string> ConvertAsync(byte[] excelBytes, string fileName, CancellationToken ct = default)
     {
         using var stream = new MemoryStream(excelBytes);
         using var reader = ExcelReaderFactory.CreateReader(stream);
@@ -27,6 +26,25 @@ public class ExcelConverter
 
         var sb = new StringBuilder();
         var sheetCount = result.Tables.Count;
+        var cleanTitle = Path.GetFileNameWithoutExtension(fileName);
+
+        sb.AppendLine($"# 📄 {cleanTitle}");
+        sb.AppendLine();
+        sb.AppendLine($"> 📌 **Hujjat:** `{fileName}` | **Sahifalar (Vkladkalar):** {sheetCount} ta | **Format:** Excel");
+        sb.AppendLine();
+
+        if (sheetCount > 1)
+        {
+            sb.AppendLine("## 📑 Mundarija (Vkladkalar)");
+            for (var i = 0; i < sheetCount; i++)
+            {
+                var name = result.Tables[i].TableName;
+                sb.AppendLine($"- [[#Sahifa: {name}|{name}]]");
+            }
+            sb.AppendLine();
+            sb.AppendLine("---");
+            sb.AppendLine();
+        }
 
         for (var i = 0; i < sheetCount; i++)
         {
@@ -34,16 +52,19 @@ public class ExcelConverter
             var table = result.Tables[i];
             if (table.Rows.Count == 0) continue;
 
-            if (sheetCount > 1)
-            {
-                sb.AppendLine($"## Sahifa: {table.TableName}");
-                sb.AppendLine();
-            }
+            sb.AppendLine($"## Sahifa: {table.TableName}");
+            sb.AppendLine();
 
             var mdTable = ConvertDataTableToMarkdown(table);
             if (!string.IsNullOrWhiteSpace(mdTable))
             {
                 sb.AppendLine(mdTable);
+                sb.AppendLine();
+            }
+
+            if (i < sheetCount - 1)
+            {
+                sb.AppendLine("---");
                 sb.AppendLine();
             }
         }

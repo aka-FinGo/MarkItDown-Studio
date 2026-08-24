@@ -18,14 +18,20 @@ public class PdfConverter
     public async Task<string> ConvertAsync(
         byte[] pdfBytes,
         string fileName,
+        string? outputDirectory,
         ConversionOptions options,
         AiProviderConfig? aiConfig,
         CancellationToken ct = default)
     {
-        var sb = new StringBuilder();
         var totalPages = 0;
         var hasSufficientText = false;
-        var pageTextList = new List<(int PageNumber, string Text, int ImageCount)>();
+        var pageTextList = new List<(int PageNumber, string Text, List<(string Name, byte[] Data)> Images)>();
+
+        var cleanDocName = Path.GetFileNameWithoutExtension(fileName).Replace(" ", "_");
+        var attachmentFolder = $"{cleanDocName}_attachments";
+        var fullAttachmentPath = !string.IsNullOrEmpty(outputDirectory)
+            ? Path.Combine(outputDirectory, attachmentFolder)
+            : Path.Combine(Environment.CurrentDirectory, attachmentFolder);
 
         try
         {
@@ -34,10 +40,34 @@ public class PdfConverter
 
             for (var i = 1; i <= totalPages; i++)
             {
+                ct.ThrowIfCancellationRequested();
                 var page = document.GetPage(i);
                 var pageText = ExtractFormattedPageText(page);
-                var imageCount = page.GetImages().Count();
-                pageTextList.Add((i, pageText, imageCount));
+
+                var pageImages = new List<(string Name, byte[] Data)>();
+                var imgIndex = 1;
+
+                foreach (var img in page.GetImages())
+                {
+                    byte[]? imgBytes = null;
+                    if (img.TryGetPng(out var pngBytes) && pngBytes.Length > 100)
+                    {
+                        imgBytes = pngBytes;
+                    }
+                    else if (img.RawBytes.Length > 100)
+                    {
+                        imgBytes = img.RawBytes.ToArray();
+                    }
+
+                    if (imgBytes != null)
+                    {
+                        var imgName = $"page_{i}_img_{imgIndex}.png";
+                        pageImages.Add((imgName, imgBytes));
+                        imgIndex++;
+                    }
+                }
+
+                pageTextList.Add((i, pageText, pageImages));
 
                 if (pageText.Length > 30)
                 {
@@ -47,84 +77,168 @@ public class PdfConverter
         }
         catch (Exception ex)
         {
-            // If local PDF parser fails and AI is configured, fallback to AI Multimodal
             if (options.EnableAi && aiConfig != null && !string.IsNullOrWhiteSpace(aiConfig.ApiKey))
             {
                 var (aiResult, _) = await _aiClient.ConvertWithAiAsync(pdfBytes, "application/pdf", fileName, aiConfig, options.CustomPrompt, ct);
-                return aiResult;
+                return FormatObsidianDocument(fileName, totalPages > 0 ? totalPages : 1, aiResult);
             }
 
             throw new InvalidOperationException($"PDF faylni o'qishda xatolik: {ex.Message}", ex);
         }
 
-        // SMART SCANNED / IMAGE-ONLY PDF DETECTION:
-        // Agar PDF skanerlangan (matn qatlami bo'sh yoki har bir sahifada < 30 belgi) bo'lsa:
         var isScannedPdf = !hasSufficientText || pageTextList.All(p => p.Text.Length < 30);
+        var hasApiKey = options.EnableAi && aiConfig != null && !string.IsNullOrWhiteSpace(aiConfig.ApiKey);
 
-        if (isScannedPdf)
+        // Make sure attachment directory exists if there are images
+        if (pageTextList.Any(p => p.Images.Count > 0))
         {
-            if (options.EnableAi && aiConfig != null && !string.IsNullOrWhiteSpace(aiConfig.ApiKey))
-            {
-                // Send directly to Multimodal Vision AI (Gemini / OpenAI / Claude / Ollama)
-                var (aiResult, _) = await _aiClient.ConvertWithAiAsync(pdfBytes, "application/pdf", fileName, aiConfig, options.CustomPrompt, ct);
-                return aiResult;
-            }
-            else
-            {
-                sb.AppendLine($"# {Path.GetFileNameWithoutExtension(fileName)}");
-                sb.AppendLine();
-                sb.AppendLine("> ⚠️ **DIQQAT: Ushbu PDF fayl skanerlangan tasvirlardan iborat (raqamli matn qatlami mavjud emas).**");
-                sb.AppendLine(">");
-                sb.AppendLine("> Skanerlangan rasmlardagi barcha matnlarni (OCR) 100% aniqlikda o'qib, Markdown qilish uchun:");
-                sb.AppendLine("> 1. Yuqoridagi **'AI Provayder'** (masalan: Google Gemini, OpenAI, Claude yoki DeepSeek) ni tanlang.");
-                sb.AppendLine("> 2. **API Kalit** maydoniga o'z kalitingizni kiriting.");
-                sb.AppendLine("> 3. Faylni qayta yuklang — sun'iy intellekt barcha sahifalardagi matn va jadvallarni to'liq o'qib beradi.");
-                sb.AppendLine();
-                sb.AppendLine("---");
-                sb.AppendLine();
-
-                for (var i = 1; i <= totalPages; i++)
-                {
-                    sb.AppendLine($"## Sahifa {i}");
-                    sb.AppendLine();
-                    sb.AppendLine("*(Skanerlangan tasvir — matnni OCR orqali o'qish uchun AI kalit kiriting)*");
-                    sb.AppendLine();
-                    if (i < totalPages)
-                    {
-                        sb.AppendLine("---");
-                        sb.AppendLine();
-                    }
-                }
-
-                return sb.ToString().Trim();
-            }
+            try { Directory.CreateDirectory(fullAttachmentPath); } catch { }
         }
 
-        // Standard text-based PDF: format pages cleanly
+        var bodySb = new StringBuilder();
+
+        // 1. Scanned PDF with Multimodal AI
+        if (isScannedPdf && hasApiKey && aiConfig != null)
+        {
+            if (aiConfig.Provider == AiProvider.GoogleGemini)
+            {
+                var (aiResult, _) = await _aiClient.ConvertWithAiAsync(pdfBytes, "application/pdf", fileName, aiConfig, options.CustomPrompt, ct);
+                return FormatObsidianDocument(fileName, totalPages, aiResult);
+            }
+
+            // OpenAI / Claude / DeepSeek / Ollama: process each page image
+            for (var idx = 0; idx < pageTextList.Count; idx++)
+            {
+                var (pageNum, _, images) = pageTextList[idx];
+                bodySb.AppendLine($"## Sahifa {pageNum}");
+                bodySb.AppendLine();
+
+                if (images.Count > 0)
+                {
+                    var (imgName, imgData) = images[0];
+                    var relativeImgPath = $"{attachmentFolder}/{imgName}";
+                    var savePath = Path.Combine(fullAttachmentPath, imgName);
+                    try { await File.WriteAllBytesAsync(savePath, imgData, ct); } catch { }
+
+                    bodySb.AppendLine($"![{imgName}]({relativeImgPath})");
+                    bodySb.AppendLine();
+
+                    var (pageMd, _) = await _aiClient.ConvertWithAiAsync(imgData, "image/png", imgName, aiConfig, options.CustomPrompt, ct);
+                    bodySb.AppendLine($"> 🤖 **[AI OCR / Tasvir Tahlili]** *(Ushbu qism `{aiConfig.Provider}` - `{aiConfig.ModelName}` modeli yordamida tayyorlandi, tekshirib ko'ring)*:\n>\n" + IndentQuote(pageMd));
+                }
+                else
+                {
+                    bodySb.AppendLine("*(Ushbu sahifada o'qiladigan matn yoki tasvir topilmadi)*");
+                }
+
+                bodySb.AppendLine();
+                if (idx < pageTextList.Count - 1)
+                {
+                    bodySb.AppendLine("---");
+                    bodySb.AppendLine();
+                }
+            }
+
+            return FormatObsidianDocument(fileName, totalPages, bodySb.ToString());
+        }
+
+        // 2. Normal or Scanned without Key
         for (var idx = 0; idx < pageTextList.Count; idx++)
         {
-            var (pageNum, text, _) = pageTextList[idx];
+            var (pageNum, text, images) = pageTextList[idx];
 
             if (totalPages > 1)
             {
-                sb.AppendLine($"## Sahifa {pageNum}");
-                sb.AppendLine();
+                bodySb.AppendLine($"## Sahifa {pageNum}");
+                bodySb.AppendLine();
             }
 
             if (!string.IsNullOrWhiteSpace(text))
             {
-                sb.AppendLine(text);
-                sb.AppendLine();
+                bodySb.AppendLine(text);
+                bodySb.AppendLine();
+            }
+            else if (images.Count == 0)
+            {
+                bodySb.AppendLine("*(Ushbu sahifada matn qatlami topilmadi)*");
+                bodySb.AppendLine();
+            }
+
+            // Embedded Images on this page
+            foreach (var (imgName, imgData) in images)
+            {
+                var relativeImgPath = $"{attachmentFolder}/{imgName}";
+                var savePath = Path.Combine(fullAttachmentPath, imgName);
+                try { await File.WriteAllBytesAsync(savePath, imgData, ct); } catch { }
+
+                bodySb.AppendLine($"![{imgName}]({relativeImgPath})");
+
+                if (hasApiKey && aiConfig != null)
+                {
+                    try
+                    {
+                        var (ocrResult, _) = await _aiClient.ConvertWithAiAsync(imgData, "image/png", imgName, aiConfig, options.CustomPrompt, ct);
+                        bodySb.AppendLine($"> 🤖 **[AI OCR / Tasvir Tahlili]** *(Ushbu qism `{aiConfig.Provider}` - `{aiConfig.ModelName}` modeli yordamida tayyorlandi, tekshirib ko'ring)*:\n>\n" + IndentQuote(ocrResult));
+                    }
+                    catch (Exception ex)
+                    {
+                        bodySb.AppendLine($"> ⚠️ *(Ushbu rasm `{relativeImgPath}` manzilida saqlandi. OCR jarayonida xatolik yuz berdi: {ex.Message})*");
+                    }
+                }
+                else
+                {
+                    bodySb.AppendLine($"> ⚠️ *(Ushbu rasm `{relativeImgPath}` manzilida saqlandi. AI API kaliti ulanmagani sababli rasmdagi matn ajratib olinmadi)*");
+                }
+                bodySb.AppendLine();
             }
 
             if (totalPages > 1 && idx < pageTextList.Count - 1)
             {
-                sb.AppendLine("---");
-                sb.AppendLine();
+                bodySb.AppendLine("---");
+                bodySb.AppendLine();
             }
         }
 
+        return FormatObsidianDocument(fileName, totalPages, bodySb.ToString());
+    }
+
+    private static string FormatObsidianDocument(string fileName, int totalPages, string bodyContent)
+    {
+        var sb = new StringBuilder();
+        var cleanTitle = Path.GetFileNameWithoutExtension(fileName);
+
+        // Clean Obsidian Header
+        sb.AppendLine($"# 📄 {cleanTitle}");
+        sb.AppendLine();
+        sb.AppendLine($"> 📌 **Hujjat:** `{fileName}` | **Sahifalar:** {totalPages} ta | **Format:** PDF");
+        sb.AppendLine();
+
+        // Table of Contents (Mundarija) with Obsidian anchor links
+        if (totalPages > 1)
+        {
+            sb.AppendLine("## 📑 Mundarija");
+            for (var i = 1; i <= totalPages; i++)
+            {
+                sb.AppendLine($"- [[#Sahifa {i}|Sahifa {i}]]");
+            }
+            sb.AppendLine();
+            sb.AppendLine("---");
+            sb.AppendLine();
+        }
+
+        sb.AppendLine(bodyContent.Trim());
         return sb.ToString().Trim();
+    }
+
+    private static string IndentQuote(string text)
+    {
+        var lines = text.Split('\n');
+        var sb = new StringBuilder();
+        foreach (var line in lines)
+        {
+            sb.AppendLine($"> {line}");
+        }
+        return sb.ToString().TrimEnd();
     }
 
     private static string ExtractFormattedPageText(Page page)
