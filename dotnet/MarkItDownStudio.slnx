@@ -1,0 +1,6 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/MarkItDown.App/MarkItDown.App.csproj" />
+    <Project Path="src/MarkItDown.Core/MarkItDown.Core.csproj" />
+  </Folder>
+</Solution>

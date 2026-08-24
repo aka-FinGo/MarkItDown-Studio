@@ -7,3 +7,6 @@ coverage/
 .env*
 !.env.example
 graphify-out/
+[Bb]in/
+[Oo]bj/
+publish/
