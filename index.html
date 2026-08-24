@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>MarkItDown Studio — Universal File to Markdown Converter</title>
+    <meta name="description" content="Convert PDF, Word, PowerPoint, Excel, CSV, JSON, HTML, Images, Audio, Code and Web pages to clean GitHub Flavored Markdown." />
+    <meta property="og:title" content="MarkItDown Studio" />
+    <meta property="og:description" content="Universal File to Markdown (.md) Converter Service powered by Microsoft MarkItDown principles and Gemini multimodal AI." />
+    <meta property="og:type" content="website" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <script>
+      (function() {
+        try {
+          var currentFetch = window.fetch ? window.fetch.bind(window) : undefined;
+          Object.defineProperty(window, 'fetch', {
+            get: function() { return currentFetch; },
+            set: function(fn) { currentFetch = fn; },
+            configurable: true,
+            enumerable: true
+          });
+        } catch (e) {}
+      })();
+    </script>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>
+

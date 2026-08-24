@@ -1,0 +1,6 @@
+{
+  "name": "MarkItDown Studio",
+  "description": "Universal file to Markdown (.md) converter service inspired by Microsoft MarkItDown, supporting documents, spreadsheets, images, audio, URLs, and code with AI enrichment.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
