@@ -36,42 +36,70 @@ public partial class MainWindow : Window
     private void LoadSavedSettings()
     {
         // 1. Theme
-        foreach (ComboBoxItem item in CmbTheme.Items)
+        if (CmbTheme != null)
         {
-            if (item.Tag?.ToString() == _config.Theme)
+            var found = false;
+            foreach (ComboBoxItem item in CmbTheme.Items)
             {
-                CmbTheme.SelectedItem = item;
-                ApplyTheme(_config.Theme);
-                break;
+                if (item.Tag?.ToString() == _config.Theme)
+                {
+                    CmbTheme.SelectedItem = item;
+                    ApplyTheme(_config.Theme);
+                    found = true;
+                    break;
+                }
+            }
+            if (!found && CmbTheme.Items.Count > 0)
+            {
+                CmbTheme.SelectedIndex = 0;
+                ApplyTheme("MidnightGlass");
             }
         }
 
         // 2. Provider
-        foreach (ComboBoxItem item in CmbAiProvider.Items)
+        if (CmbAiProvider != null)
         {
-            if (item.Tag?.ToString() == _config.SelectedProvider.ToString())
+            var found = false;
+            foreach (ComboBoxItem item in CmbAiProvider.Items)
             {
-                CmbAiProvider.SelectedItem = item;
-                break;
+                if (item.Tag?.ToString() == _config.SelectedProvider.ToString())
+                {
+                    CmbAiProvider.SelectedItem = item;
+                    found = true;
+                    break;
+                }
+            }
+            if (!found && CmbAiProvider.Items.Count > 0)
+            {
+                CmbAiProvider.SelectedIndex = 0;
             }
         }
 
         PopulateModelNames(_config.SelectedProvider);
 
         // 3. Model
-        if (!string.IsNullOrEmpty(_config.SelectedModel))
+        if (CmbModelName != null && !string.IsNullOrEmpty(_config.SelectedModel))
         {
             CmbModelName.Text = _config.SelectedModel;
         }
 
         // 4. API Key
         var savedKey = _config.GetApiKey(_config.SelectedProvider);
-        TxtApiKey.Password = savedKey;
+        if (TxtApiKey != null)
+        {
+            TxtApiKey.Password = savedKey;
+        }
         UpdateKeyStatusAndGuide(_config.SelectedProvider, savedKey);
 
         // 5. Custom URL & AI switch
-        TxtCustomBaseUrl.Text = _config.CustomBaseUrl ?? "http://localhost:11434";
-        ChkEnableAi.IsChecked = _config.EnableAi;
+        if (TxtCustomBaseUrl != null)
+        {
+            TxtCustomBaseUrl.Text = _config.CustomBaseUrl ?? "http://localhost:11434";
+        }
+        if (ChkEnableAi != null)
+        {
+            ChkEnableAi.IsChecked = _config.EnableAi;
+        }
     }
 
     private void LoadDefaultSample()
@@ -95,7 +123,10 @@ public partial class MainWindow : Window
 ## 3. Smart Fallback (Avtomatik o'tish)
 - Agar tanlangan modelning limiti tugasa yoki band bo'lsa, tizim avtomatik zaxira modelga o'tib, konvertatsiyani to'xtovsiz davom ettiradi!
 ";
-        TxtMarkdownEditor.Text = welcomeMd;
+        if (TxtMarkdownEditor != null)
+        {
+            TxtMarkdownEditor.Text = welcomeMd;
+        }
     }
 
     // Title Bar Drag & Window Controls
@@ -116,34 +147,36 @@ public partial class MainWindow : Window
     // Theme Switcher & Modal Adaptation
     private void CmbTheme_SelectionChanged(object sender, SelectionChangedEventArgs e)
     {
+        if (_isInitializing || CmbTheme == null) return;
+
         if (CmbTheme.SelectedItem is ComboBoxItem item)
         {
             var theme = item.Tag?.ToString() ?? "MidnightGlass";
             ApplyTheme(theme);
-            if (!_isInitializing)
-            {
-                _config.Theme = theme;
-                _config.Save();
-            }
+            _config.Theme = theme;
+            _config.Save();
         }
     }
 
     private void ApplyTheme(string theme)
     {
+        if (MainBorder == null || TitleBarBorder == null || DropArea == null || EditorContainerBorder == null)
+            return;
+
         switch (theme)
         {
             case "ObsidianDark":
                 MainBorder.Background = new SolidColorBrush(Color.FromRgb(20, 20, 20));
                 MainBorder.BorderBrush = new SolidColorBrush(Color.FromRgb(50, 50, 50));
                 TitleBarBorder.Background = new SolidColorBrush(Color.FromRgb(28, 28, 28));
-                SettingsBarBorder.Background = new SolidColorBrush(Color.FromRgb(24, 24, 24));
+                if (SettingsBarBorder != null) SettingsBarBorder.Background = new SolidColorBrush(Color.FromRgb(24, 24, 24));
                 DropArea.Background = new SolidColorBrush(Color.FromRgb(30, 30, 30));
                 DropArea.BorderBrush = new SolidColorBrush(Color.FromRgb(168, 85, 247));
-                DropIconBadge.Background = new SolidColorBrush(Color.FromRgb(88, 28, 135));
-                LogoBadge.Background = new SolidColorBrush(Color.FromRgb(168, 85, 247));
+                if (DropIconBadge != null) DropIconBadge.Background = new SolidColorBrush(Color.FromRgb(88, 28, 135));
+                if (LogoBadge != null) LogoBadge.Background = new SolidColorBrush(Color.FromRgb(168, 85, 247));
                 EditorContainerBorder.Background = new SolidColorBrush(Color.FromRgb(24, 24, 24));
-                EditorInnerBorder.Background = new SolidColorBrush(Color.FromRgb(16, 16, 16));
-                FooterBorder.Background = new SolidColorBrush(Color.FromRgb(20, 20, 20));
+                if (EditorInnerBorder != null) EditorInnerBorder.Background = new SolidColorBrush(Color.FromRgb(16, 16, 16));
+                if (FooterBorder != null) FooterBorder.Background = new SolidColorBrush(Color.FromRgb(20, 20, 20));
                 if (ModalDialogBorder != null)
                 {
                     ModalDialogBorder.Background = new SolidColorBrush(Color.FromRgb(28, 28, 28));
@@ -155,14 +188,14 @@ public partial class MainWindow : Window
                 MainBorder.Background = new SolidColorBrush(Color.FromRgb(5, 8, 17));
                 MainBorder.BorderBrush = new SolidColorBrush(Color.FromRgb(6, 182, 212));
                 TitleBarBorder.Background = new SolidColorBrush(Color.FromRgb(10, 15, 30));
-                SettingsBarBorder.Background = new SolidColorBrush(Color.FromRgb(8, 12, 24));
+                if (SettingsBarBorder != null) SettingsBarBorder.Background = new SolidColorBrush(Color.FromRgb(8, 12, 24));
                 DropArea.Background = new SolidColorBrush(Color.FromRgb(15, 23, 42));
                 DropArea.BorderBrush = new SolidColorBrush(Color.FromRgb(6, 182, 212));
-                DropIconBadge.Background = new SolidColorBrush(Color.FromRgb(8, 145, 178));
-                LogoBadge.Background = new SolidColorBrush(Color.FromRgb(6, 182, 212));
+                if (DropIconBadge != null) DropIconBadge.Background = new SolidColorBrush(Color.FromRgb(8, 145, 178));
+                if (LogoBadge != null) LogoBadge.Background = new SolidColorBrush(Color.FromRgb(6, 182, 212));
                 EditorContainerBorder.Background = new SolidColorBrush(Color.FromRgb(15, 23, 42));
-                EditorInnerBorder.Background = new SolidColorBrush(Color.FromRgb(2, 6, 23));
-                FooterBorder.Background = new SolidColorBrush(Color.FromRgb(5, 8, 17));
+                if (EditorInnerBorder != null) EditorInnerBorder.Background = new SolidColorBrush(Color.FromRgb(2, 6, 23));
+                if (FooterBorder != null) FooterBorder.Background = new SolidColorBrush(Color.FromRgb(5, 8, 17));
                 if (ModalDialogBorder != null)
                 {
                     ModalDialogBorder.Background = new SolidColorBrush(Color.FromRgb(10, 15, 30));
@@ -174,17 +207,17 @@ public partial class MainWindow : Window
                 MainBorder.Background = new SolidColorBrush(Color.FromRgb(241, 245, 249));
                 MainBorder.BorderBrush = new SolidColorBrush(Color.FromRgb(203, 213, 225));
                 TitleBarBorder.Background = new SolidColorBrush(Color.FromRgb(255, 255, 255));
-                SettingsBarBorder.Background = new SolidColorBrush(Color.FromRgb(248, 250, 252));
+                if (SettingsBarBorder != null) SettingsBarBorder.Background = new SolidColorBrush(Color.FromRgb(248, 250, 252));
                 DropArea.Background = new SolidColorBrush(Color.FromRgb(255, 255, 255));
                 DropArea.BorderBrush = new SolidColorBrush(Color.FromRgb(59, 130, 246));
-                DropIconBadge.Background = new SolidColorBrush(Color.FromRgb(219, 234, 254));
-                LogoBadge.Background = new SolidColorBrush(Color.FromRgb(59, 130, 246));
+                if (DropIconBadge != null) DropIconBadge.Background = new SolidColorBrush(Color.FromRgb(219, 234, 254));
+                if (LogoBadge != null) LogoBadge.Background = new SolidColorBrush(Color.FromRgb(59, 130, 246));
                 EditorContainerBorder.Background = new SolidColorBrush(Color.FromRgb(255, 255, 255));
-                EditorInnerBorder.Background = new SolidColorBrush(Color.FromRgb(248, 250, 252));
-                FooterBorder.Background = new SolidColorBrush(Color.FromRgb(241, 245, 249));
-                TxtAppTitle.Foreground = new SolidColorBrush(Color.FromRgb(15, 23, 42));
-                TxtDocTitle.Foreground = new SolidColorBrush(Color.FromRgb(15, 23, 42));
-                TxtMarkdownEditor.Foreground = new SolidColorBrush(Color.FromRgb(30, 41, 59));
+                if (EditorInnerBorder != null) EditorInnerBorder.Background = new SolidColorBrush(Color.FromRgb(248, 250, 252));
+                if (FooterBorder != null) FooterBorder.Background = new SolidColorBrush(Color.FromRgb(241, 245, 249));
+                if (TxtAppTitle != null) TxtAppTitle.Foreground = new SolidColorBrush(Color.FromRgb(15, 23, 42));
+                if (TxtDocTitle != null) TxtDocTitle.Foreground = new SolidColorBrush(Color.FromRgb(15, 23, 42));
+                if (TxtMarkdownEditor != null) TxtMarkdownEditor.Foreground = new SolidColorBrush(Color.FromRgb(30, 41, 59));
                 if (ModalDialogBorder != null)
                 {
                     ModalDialogBorder.Background = new SolidColorBrush(Color.FromRgb(255, 255, 255));
@@ -196,17 +229,17 @@ public partial class MainWindow : Window
                 MainBorder.Background = new SolidColorBrush(Color.FromRgb(15, 23, 42));
                 MainBorder.BorderBrush = new SolidColorBrush(Color.FromRgb(51, 65, 85));
                 TitleBarBorder.Background = new SolidColorBrush(Color.FromRgb(30, 41, 59));
-                SettingsBarBorder.Background = new SolidColorBrush(Color.FromRgb(22, 32, 50));
+                if (SettingsBarBorder != null) SettingsBarBorder.Background = new SolidColorBrush(Color.FromRgb(22, 32, 50));
                 DropArea.Background = new SolidColorBrush(Color.FromRgb(30, 41, 59));
                 DropArea.BorderBrush = new SolidColorBrush(Color.FromRgb(99, 102, 241));
-                DropIconBadge.Background = new SolidColorBrush(Color.FromRgb(49, 46, 129));
-                LogoBadge.Background = new SolidColorBrush(Color.FromRgb(99, 102, 241));
+                if (DropIconBadge != null) DropIconBadge.Background = new SolidColorBrush(Color.FromRgb(49, 46, 129));
+                if (LogoBadge != null) LogoBadge.Background = new SolidColorBrush(Color.FromRgb(99, 102, 241));
                 EditorContainerBorder.Background = new SolidColorBrush(Color.FromRgb(30, 41, 59));
-                EditorInnerBorder.Background = new SolidColorBrush(Color.FromRgb(11, 17, 32));
-                FooterBorder.Background = new SolidColorBrush(Color.FromRgb(15, 23, 42));
-                TxtAppTitle.Foreground = new SolidColorBrush(Color.FromRgb(248, 250, 252));
-                TxtDocTitle.Foreground = new SolidColorBrush(Color.FromRgb(248, 250, 252));
-                TxtMarkdownEditor.Foreground = new SolidColorBrush(Color.FromRgb(226, 232, 240));
+                if (EditorInnerBorder != null) EditorInnerBorder.Background = new SolidColorBrush(Color.FromRgb(11, 17, 32));
+                if (FooterBorder != null) FooterBorder.Background = new SolidColorBrush(Color.FromRgb(15, 23, 42));
+                if (TxtAppTitle != null) TxtAppTitle.Foreground = new SolidColorBrush(Color.FromRgb(248, 250, 252));
+                if (TxtDocTitle != null) TxtDocTitle.Foreground = new SolidColorBrush(Color.FromRgb(248, 250, 252));
+                if (TxtMarkdownEditor != null) TxtMarkdownEditor.Foreground = new SolidColorBrush(Color.FromRgb(226, 232, 240));
                 if (ModalDialogBorder != null)
                 {
                     ModalDialogBorder.Background = new SolidColorBrush(Color.FromRgb(30, 41, 59));
@@ -219,6 +252,8 @@ public partial class MainWindow : Window
     // AI Provider Switcher
     private void CmbAiProvider_SelectionChanged(object sender, SelectionChangedEventArgs e)
     {
+        if (_isInitializing || CmbAiProvider == null) return;
+
         if (CmbAiProvider.SelectedItem is ComboBoxItem item && Enum.TryParse<AiProvider>(item.Tag?.ToString(), out var provider))
         {
             PopulateModelNames(provider);
@@ -231,14 +266,14 @@ public partial class MainWindow : Window
             }
 
             var key = _config.GetApiKey(provider);
-            TxtApiKey.Password = key;
+            if (TxtApiKey != null)
+            {
+                TxtApiKey.Password = key;
+            }
             UpdateKeyStatusAndGuide(provider, key);
 
-            if (!_isInitializing)
-            {
-                _config.SelectedProvider = provider;
-                _config.Save();
-            }
+            _config.SelectedProvider = provider;
+            _config.Save();
         }
     }
 
@@ -253,13 +288,16 @@ public partial class MainWindow : Window
             {
                 CmbModelName.Items.Add(model);
             }
-            CmbModelName.SelectedIndex = 0;
+            if (CmbModelName.Items.Count > 0)
+            {
+                CmbModelName.SelectedIndex = 0;
+            }
         }
     }
 
     private void TxtApiKey_PasswordChanged(object sender, RoutedEventArgs e)
     {
-        if (_isInitializing) return;
+        if (_isInitializing || TxtApiKey == null) return;
         var key = TxtApiKey.Password?.Trim() ?? string.Empty;
         var provider = GetSelectedProvider();
         _config.SetApiKey(provider, key);
@@ -268,21 +306,21 @@ public partial class MainWindow : Window
 
     private void CmbModelName_LostFocus(object sender, RoutedEventArgs e)
     {
-        if (_isInitializing) return;
+        if (_isInitializing || CmbModelName == null) return;
         _config.SelectedModel = CmbModelName.Text?.Trim() ?? "gemini-2.5-flash";
         _config.Save();
     }
 
     private void TxtCustomBaseUrl_LostFocus(object sender, RoutedEventArgs e)
     {
-        if (_isInitializing) return;
+        if (_isInitializing || TxtCustomBaseUrl == null) return;
         _config.CustomBaseUrl = TxtCustomBaseUrl.Text?.Trim();
         _config.Save();
     }
 
     private void ChkEnableAi_Changed(object sender, RoutedEventArgs e)
     {
-        if (_isInitializing) return;
+        if (_isInitializing || ChkEnableAi == null) return;
         _config.EnableAi = ChkEnableAi.IsChecked == true;
         _config.Save();
     }
@@ -291,14 +329,20 @@ public partial class MainWindow : Window
     {
         if (!string.IsNullOrEmpty(key))
         {
-            TxtKeyStatus.Text = "🔒 Kalit saqlandi";
-            TxtKeyStatus.Foreground = new SolidColorBrush(Color.FromRgb(16, 185, 129));
+            if (TxtKeyStatus != null)
+            {
+                TxtKeyStatus.Text = "🔒 Kalit saqlandi";
+                TxtKeyStatus.Foreground = new SolidColorBrush(Color.FromRgb(16, 185, 129));
+            }
             if (PnlKeyGuide != null) PnlKeyGuide.Visibility = Visibility.Collapsed;
         }
         else
         {
-            TxtKeyStatus.Text = "⚠️ Kalit kiritilmagan";
-            TxtKeyStatus.Foreground = new SolidColorBrush(Color.FromRgb(245, 158, 11));
+            if (TxtKeyStatus != null)
+            {
+                TxtKeyStatus.Text = "⚠️ Kalit kiritilmagan";
+                TxtKeyStatus.Foreground = new SolidColorBrush(Color.FromRgb(245, 158, 11));
+            }
             if (PnlKeyGuide != null && TxtKeyGuide != null)
             {
                 PnlKeyGuide.Visibility = Visibility.Visible;
@@ -312,7 +356,7 @@ public partial class MainWindow : Window
 
     private AiProvider GetSelectedProvider()
     {
-        if (CmbAiProvider.SelectedItem is ComboBoxItem item && Enum.TryParse<AiProvider>(item.Tag?.ToString(), out var p))
+        if (CmbAiProvider?.SelectedItem is ComboBoxItem item && Enum.TryParse<AiProvider>(item.Tag?.ToString(), out var p))
         {
             return p;
         }
@@ -325,9 +369,9 @@ public partial class MainWindow : Window
         return new AiProviderConfig
         {
             Provider = provider,
-            ApiKey = TxtApiKey.Password?.Trim() ?? string.Empty,
-            ModelName = CmbModelName.Text?.Trim() ?? "gemini-2.5-flash",
-            CustomBaseUrl = TxtCustomBaseUrl.Text?.Trim()
+            ApiKey = TxtApiKey?.Password?.Trim() ?? string.Empty,
+            ModelName = CmbModelName?.Text?.Trim() ?? "gemini-2.5-flash",
+            CustomBaseUrl = TxtCustomBaseUrl?.Text?.Trim()
         };
     }
 
@@ -335,7 +379,7 @@ public partial class MainWindow : Window
     {
         return new ConversionOptions
         {
-            EnableAi = ChkEnableAi.IsChecked == true,
+            EnableAi = ChkEnableAi?.IsChecked == true,
             IncludeFrontmatter = false,
             CustomPrompt = _config.CustomPrompt,
             AutoOcrScannedPdf = true
@@ -345,7 +389,7 @@ public partial class MainWindow : Window
     // Drag and Drop
     private void DropArea_DragEnter(object sender, DragEventArgs e)
     {
-        if (e.Data.GetDataPresent(DataFormats.FileDrop))
+        if (e.Data.GetDataPresent(DataFormats.FileDrop) && DropArea != null)
         {
             DropArea.BorderBrush = new SolidColorBrush(Color.FromRgb(129, 140, 248));
         }
@@ -353,7 +397,10 @@ public partial class MainWindow : Window
 
     private void DropArea_DragLeave(object sender, DragEventArgs e)
     {
-        DropArea.BorderBrush = new SolidColorBrush(Color.FromRgb(99, 102, 241));
+        if (DropArea != null)
+        {
+            DropArea.BorderBrush = new SolidColorBrush(Color.FromRgb(99, 102, 241));
+        }
     }
 
     private async void DropArea_Drop(object sender, DragEventArgs e)
@@ -389,14 +436,14 @@ public partial class MainWindow : Window
         var options = GetCurrentOptions();
         var aiConfig = GetCurrentAiConfig();
 
-        TxtStatus.Text = $"{filePaths.Length} ta fayl Markdown formatiga o'tkazilmoqda...";
+        if (TxtStatus != null) TxtStatus.Text = $"{filePaths.Length} ta fayl Markdown formatiga o'tkazilmoqda...";
 
         foreach (var path in filePaths)
         {
             try
             {
                 var fileName = Path.GetFileName(path);
-                TxtStatus.Text = $"Tahlil qilinmoqda: {fileName}...";
+                if (TxtStatus != null) TxtStatus.Text = $"Tahlil qilinmoqda: {fileName}...";
 
                 var results = await _engine.ConvertFileAsync(path, options, aiConfig);
 
@@ -412,11 +459,12 @@ public partial class MainWindow : Window
             }
         }
 
-        TxtStatus.Text = "Barcha fayllar muvaffaqiyatli o'girildi!";
+        if (TxtStatus != null) TxtStatus.Text = "Barcha fayllar muvaffaqiyatli o'girildi!";
     }
 
     private async void BtnConvertUrl_Click(object sender, RoutedEventArgs e)
     {
+        if (TxtWebUrl == null) return;
         var url = TxtWebUrl.Text.Trim();
         if (string.IsNullOrWhiteSpace(url) || !url.StartsWith("http", StringComparison.OrdinalIgnoreCase))
         {
@@ -424,7 +472,7 @@ public partial class MainWindow : Window
             return;
         }
 
-        TxtStatus.Text = $"Web sahifa yuklanmoqda: {url}...";
+        if (TxtStatus != null) TxtStatus.Text = $"Web sahifa yuklanmoqda: {url}...";
         try
         {
             var options = GetCurrentOptions();
@@ -433,21 +481,21 @@ public partial class MainWindow : Window
             var result = await _engine.ConvertUrlAsync(url, options, aiConfig);
             ConvertedItems.Insert(0, result);
             SetActiveResult(result);
-            TxtStatus.Text = "Web sahifa muvaffaqiyatli Markdown formatiga o'girildi!";
+            if (TxtStatus != null) TxtStatus.Text = "Web sahifa muvaffaqiyatli Markdown formatiga o'girildi!";
         }
         catch (Exception ex)
         {
             MessageBox.Show($"URL ni o'girishda xatolik:\n{ex.Message}", "Xatolik", MessageBoxButton.OK, MessageBoxImage.Error);
-            TxtStatus.Text = "Xatolik yuz berdi.";
+            if (TxtStatus != null) TxtStatus.Text = "Xatolik yuz berdi.";
         }
     }
 
     private void SetActiveResult(ConversionResult result)
     {
         _activeResult = result;
-        TxtDocTitle.Text = result.FileName;
-        TxtDocStats.Text = $"Format: {result.OriginalFormat} • {result.WordCount:N0} ta so'z • {result.CharCount:N0} ta belgi • {result.DurationMs} ms • Dvigatel: {result.EngineName}";
-        TxtMarkdownEditor.Text = result.Markdown;
+        if (TxtDocTitle != null) TxtDocTitle.Text = result.FileName;
+        if (TxtDocStats != null) TxtDocStats.Text = $"Format: {result.OriginalFormat} • {result.WordCount:N0} ta so'z • {result.CharCount:N0} ta belgi • {result.DurationMs} ms • Dvigatel: {result.EngineName}";
+        if (TxtMarkdownEditor != null) TxtMarkdownEditor.Text = result.Markdown;
     }
 
     private void LstConvertedItems_SelectionChanged(object sender, SelectionChangedEventArgs e)
@@ -475,7 +523,7 @@ public partial class MainWindow : Window
                     LoadDefaultSample();
                 }
             }
-            TxtStatus.Text = $"\"{item.FileName}\" ro'yxatdan o'chirildi.";
+            if (TxtStatus != null) TxtStatus.Text = $"\"{item.FileName}\" ro'yxatdan o'chirildi.";
         }
     }
 
@@ -488,14 +536,14 @@ public partial class MainWindow : Window
         {
             ConvertedItems.Clear();
             LoadDefaultSample();
-            TxtStatus.Text = "Barcha tarix tozalandi.";
+            if (TxtStatus != null) TxtStatus.Text = "Barcha tarix tozalandi.";
         }
     }
 
     // 3. AI Proofreader / Error Fixer
     private async void BtnAiProofread_Click(object sender, RoutedEventArgs e)
     {
-        var currentText = TxtMarkdownEditor.Text?.Trim();
+        var currentText = TxtMarkdownEditor?.Text?.Trim();
         if (string.IsNullOrEmpty(currentText))
         {
             MessageBox.Show("Tekshirish uchun Markdown matni mavjud emas.", "Xabar", MessageBoxButton.OK, MessageBoxImage.Information);
@@ -509,7 +557,7 @@ public partial class MainWindow : Window
             return;
         }
 
-        TxtStatus.Text = "AI Markdown matnidagi xatoliklar va jadvallarni tekshirmoqda...";
+        if (TxtStatus != null) TxtStatus.Text = "AI Markdown matnidagi xatoliklar va jadvallarni tekshirmoqda...";
         try
         {
             var prompt = @"Ushbu Markdown hujjatidagi barcha orfografik, grammatik xatoliklarni, buzilgan jadvallarni va Lotin/Krill chalkashliklarini (o'/ў, g'/ғ, sh/ш, ch/ч) to'liq to'g'rilab, toza va chiroyli Markdown qilib qaytar. Ortiqcha izohlarsiz, faqat to'g'rilangan yakuniy Markdownni ber.";
@@ -517,54 +565,54 @@ public partial class MainWindow : Window
 
             var (correctedMd, _) = await _aiClient.ConvertWithAiAsync(rawBytes, "text/plain", "document_review.md", aiConfig, prompt);
 
-            TxtAiProofreadResult.Text = correctedMd;
-            PnlAiReviewModal.Visibility = Visibility.Visible;
-            TxtStatus.Text = "AI tahlili yakunlandi! Natijani ko'rib chiqishingiz mumkin.";
+            if (TxtAiProofreadResult != null) TxtAiProofreadResult.Text = correctedMd;
+            if (PnlAiReviewModal != null) PnlAiReviewModal.Visibility = Visibility.Visible;
+            if (TxtStatus != null) TxtStatus.Text = "AI tahlili yakunlandi! Natijani ko'rib chiqishingiz mumkin.";
         }
         catch (Exception ex)
         {
             MessageBox.Show($"AI tekshirishida xatolik:\n{ex.Message}", "Xatolik", MessageBoxButton.OK, MessageBoxImage.Error);
-            TxtStatus.Text = "Xatolik yuz berdi.";
+            if (TxtStatus != null) TxtStatus.Text = "Xatolik yuz berdi.";
         }
     }
 
     private void BtnCloseReviewModal_Click(object sender, RoutedEventArgs e)
     {
-        PnlAiReviewModal.Visibility = Visibility.Collapsed;
+        if (PnlAiReviewModal != null) PnlAiReviewModal.Visibility = Visibility.Collapsed;
     }
 
     private void BtnApplyAiProofread_Click(object sender, RoutedEventArgs e)
     {
-        var corrected = TxtAiProofreadResult.Text;
+        var corrected = TxtAiProofreadResult?.Text;
         if (!string.IsNullOrEmpty(corrected))
         {
-            TxtMarkdownEditor.Text = corrected;
+            if (TxtMarkdownEditor != null) TxtMarkdownEditor.Text = corrected;
             if (_activeResult != null)
             {
                 _activeResult.Markdown = corrected;
                 _activeResult.WordCount = MarkItDownEngine.CountWords(corrected);
                 _activeResult.CharCount = corrected.Length;
                 _activeResult.EstimatedTokens = MarkItDownEngine.EstimateTokens(corrected);
-                TxtDocStats.Text = $"Format: {_activeResult.OriginalFormat} • {_activeResult.WordCount:N0} ta so'z • {_activeResult.CharCount:N0} ta belgi (AI bilan tekshirildi)";
+                if (TxtDocStats != null) TxtDocStats.Text = $"Format: {_activeResult.OriginalFormat} • {_activeResult.WordCount:N0} ta so'z • {_activeResult.CharCount:N0} ta belgi (AI bilan tekshirildi)";
             }
-            PnlAiReviewModal.Visibility = Visibility.Collapsed;
-            TxtStatus.Text = "AI tuzatishlari hujjatga muvaffaqiyatli qo'llandi!";
+            if (PnlAiReviewModal != null) PnlAiReviewModal.Visibility = Visibility.Collapsed;
+            if (TxtStatus != null) TxtStatus.Text = "AI tuzatishlari hujjatga muvaffaqiyatli qo'llandi!";
             MessageBox.Show("Markdown hujjati AI tuzatishlari bilan muvaffaqiyatli yangilandi!", "Muvaffaqiyatli", MessageBoxButton.OK, MessageBoxImage.Information);
         }
     }
 
     private void BtnCopyMarkdown_Click(object sender, RoutedEventArgs e)
     {
-        if (!string.IsNullOrEmpty(TxtMarkdownEditor.Text))
+        if (TxtMarkdownEditor != null && !string.IsNullOrEmpty(TxtMarkdownEditor.Text))
         {
             Clipboard.SetText(TxtMarkdownEditor.Text);
-            TxtStatus.Text = "Markdown matni buferga nusxalandi! (Clipboard)";
+            if (TxtStatus != null) TxtStatus.Text = "Markdown matni buferga nusxalandi! (Clipboard)";
         }
     }
 
     private void BtnSaveMarkdown_Click(object sender, RoutedEventArgs e)
     {
-        if (string.IsNullOrWhiteSpace(TxtMarkdownEditor.Text))
+        if (TxtMarkdownEditor == null || string.IsNullOrWhiteSpace(TxtMarkdownEditor.Text))
         {
             MessageBox.Show("Saqlash uchun Markdown matni mavjud emas.", "Xabar", MessageBoxButton.OK, MessageBoxImage.Information);
             return;
@@ -584,7 +632,7 @@ public partial class MainWindow : Window
         if (dlg.ShowDialog() == true)
         {
             File.WriteAllText(dlg.FileName, TxtMarkdownEditor.Text, System.Text.Encoding.UTF8);
-            TxtStatus.Text = $"Fayl saqlandi: {dlg.FileName}";
+            if (TxtStatus != null) TxtStatus.Text = $"Fayl saqlandi: {dlg.FileName}";
             MessageBox.Show($"Markdown fayli muvaffaqiyatli saqlandi!\n{dlg.FileName}", "Muvaffaqiyatli", MessageBoxButton.OK, MessageBoxImage.Information);
         }
     }

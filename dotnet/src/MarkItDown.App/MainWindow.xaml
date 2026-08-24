@@ -53,7 +53,7 @@
                             <TextBlock Text="🎨 Mavzu:" Foreground="#94A3B8" FontSize="11" VerticalAlignment="Center" Margin="0,0,6,0" />
                             <ComboBox x:Name="CmbTheme" Width="135" Height="26" SelectionChanged="CmbTheme_SelectionChanged"
                                       Background="#0F172A" Foreground="#F8FAFC" BorderBrush="#334155" FontSize="11" Padding="4,2">
-                                <ComboBoxItem Content="Midnight Glass" Tag="MidnightGlass" IsSelected="True" />
+                                <ComboBoxItem Content="Midnight Glass" Tag="MidnightGlass" />
                                 <ComboBoxItem Content="Obsidian Dark" Tag="ObsidianDark" />
                                 <ComboBoxItem Content="Cyberpunk Neon" Tag="CyberpunkNeon" />
                                 <ComboBoxItem Content="Frosted Crystal" Tag="FrostedCrystal" />
@@ -90,7 +90,7 @@
                                 <TextBlock Text="AI Provayder:" Foreground="#94A3B8" FontSize="12" VerticalAlignment="Center" Margin="0,0,6,0" />
                                 <ComboBox x:Name="CmbAiProvider" Width="145" Height="30" SelectionChanged="CmbAiProvider_SelectionChanged"
                                           Background="#0F172A" Foreground="#F8FAFC" BorderBrush="#334155" Padding="6,4">
-                                    <ComboBoxItem Content="Google Gemini" IsSelected="True" Tag="GoogleGemini" />
+                                    <ComboBoxItem Content="Google Gemini" Tag="GoogleGemini" />
                                     <ComboBoxItem Content="Groq AI (Ultra-Tez)" Tag="GroqAI" />
                                     <ComboBoxItem Content="OpenAI" Tag="OpenAI" />
                                     <ComboBoxItem Content="Anthropic Claude" Tag="AnthropicClaude" />
