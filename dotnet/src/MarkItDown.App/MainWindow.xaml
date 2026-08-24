@@ -5,7 +5,7 @@
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         mc:Ignorable="d"
         Title="MarkItDown Studio .NET"
-        Height="850" Width="1340"
+        Height="860" Width="1360"
         MinHeight="660" MinWidth="1000"
         WindowStyle="None"
         AllowsTransparency="True"
@@ -184,7 +184,7 @@
                         </Grid>
                     </Border>
 
-                    <!-- Converted Items History -->
+                    <!-- Converted Items History with Individual Delete and Clear All -->
                     <Border x:Name="HistoryBoxBorder" Grid.Row="2" Background="#1E293B" BorderBrush="#334155" BorderThickness="1" CornerRadius="10" Padding="10">
                         <Grid>
                             <Grid.RowDefinitions>
@@ -193,27 +193,32 @@
                             </Grid.RowDefinitions>
                             <Grid Grid.Row="0" Margin="0,0,0,8">
                                 <TextBlock Text="O'girilgan Hujjatlar" Foreground="#F8FAFC" FontWeight="SemiBold" FontSize="12" VerticalAlignment="Center" />
-                                <Button Click="BtnClearHistory_Click" HorizontalAlignment="Right" Style="{StaticResource GlassButton}" Content="Tozalash" Padding="6,2" FontSize="10" />
+                                <Button Click="BtnClearHistory_Click" HorizontalAlignment="Right" Style="{StaticResource GlassButton}" Content="🗑️ Barchasini Tozalash" Padding="8,3" FontSize="10" />
                             </Grid>
                             <ListBox x:Name="LstConvertedItems" Grid.Row="1" Background="Transparent" BorderThickness="0"
                                      SelectionChanged="LstConvertedItems_SelectionChanged" ScrollViewer.HorizontalScrollBarVisibility="Disabled">
                                 <ListBox.ItemTemplate>
                                     <DataTemplate>
-                                        <Border Background="#0F172A" BorderBrush="#334155" BorderThickness="1" CornerRadius="8" Padding="10" Margin="0,0,0,6">
+                                        <Border Background="#0F172A" BorderBrush="#334155" BorderThickness="1" CornerRadius="8" Padding="8" Margin="0,0,0,6">
                                             <Grid>
                                                 <Grid.ColumnDefinitions>
                                                     <ColumnDefinition Width="*" />
                                                     <ColumnDefinition Width="Auto" />
+                                                    <ColumnDefinition Width="Auto" />
                                                 </Grid.ColumnDefinitions>
-                                                <StackPanel Grid.Column="0">
+                                                <StackPanel Grid.Column="0" VerticalAlignment="Center">
                                                     <TextBlock Text="{Binding FileName}" Foreground="#F8FAFC" FontWeight="SemiBold" FontSize="12" TextTrimming="CharacterEllipsis" />
                                                     <TextBlock Foreground="#94A3B8" FontSize="10" Margin="0,2,0,0">
                                                         <Run Text="{Binding WordCount}" /> <Run Text="so'z •" /> <Run Text="{Binding DurationMs}" /> <Run Text="ms" />
                                                     </TextBlock>
                                                 </StackPanel>
-                                                <Border Grid.Column="1" Background="#312E81" CornerRadius="4" Padding="6,2" VerticalAlignment="Center">
-                                                    <TextBlock Text="{Binding OriginalFormat}" Foreground="#A5B4FC" FontSize="10" FontWeight="Bold" />
+                                                <Border Grid.Column="1" Background="#312E81" CornerRadius="4" Padding="5,2" VerticalAlignment="Center" Margin="0,0,6,0">
+                                                    <TextBlock Text="{Binding OriginalFormat}" Foreground="#A5B4FC" FontSize="9" FontWeight="Bold" />
                                                 </Border>
+                                                <!-- Single item delete button -->
+                                                <Button Grid.Column="2" Tag="{Binding}" Click="BtnDeleteSingleItem_Click" Style="{StaticResource GlassButton}" Padding="4,2" ToolTip="Ushbu faylni o'chirish">
+                                                    <TextBlock Text="✕" Foreground="#F87171" FontSize="10" FontWeight="Bold" />
+                                                </Button>
                                             </Grid>
                                         </Border>
                                     </DataTemplate>
@@ -247,8 +252,10 @@
                             </StackPanel>
 
                             <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
+                                <!-- AI Proofreader & Fixer Button -->
+                                <Button Click="BtnAiProofread_Click" Style="{StaticResource GlassButton}" Content="✨ AI Bilan Tekshirish" Margin="0,0,8,0" Padding="10,6" FontSize="12" ToolTip="Grammatika, jadvallar va format xatoliklarini AI orqali tekshirish" />
                                 <Button Click="BtnCopyMarkdown_Click" Style="{StaticResource GlassButton}" Content="📋 Nusxalash" Margin="0,0,8,0" Padding="12,6" FontSize="12" />
-                                <Button Click="BtnSaveMarkdown_Click" Style="{StaticResource AccentButton}" Content="💾 .md Faylga Saqlash" Padding="14,6" FontSize="12" />
+                                <Button Click="BtnSaveMarkdown_Click" Style="{StaticResource AccentButton}" Content="💾 .md Saqlash" Padding="14,6" FontSize="12" />
                             </StackPanel>
                         </Grid>
 
@@ -275,6 +282,43 @@
                     <TextBlock x:Name="TxtStatus" Grid.Column="0" Text="Tayyor. PDF, Word, Excel, PPTX, Rasm yoki Audio yuklang." Foreground="#94A3B8" FontSize="11" />
                     <TextBlock Grid.Column="1" Text="Multi-AI Auto-Fallback Architecture • 100% C# .NET 10" Foreground="#64748B" FontSize="11" />
                 </Grid>
+            </Border>
+
+            <!-- 5. AI Proofreader / Review Modal Overlay -->
+            <Border x:Name="PnlAiReviewModal" Grid.RowSpan="4" Background="#CC000000" Visibility="Collapsed" CornerRadius="16">
+                <Border x:Name="ModalDialogBorder" Width="850" MaxHeight="600" Background="#1E293B" BorderBrush="#6366F1" BorderThickness="2" CornerRadius="16" Padding="20" HorizontalAlignment="Center" VerticalAlignment="Center">
+                    <Grid>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="*" />
+                            <RowDefinition Height="Auto" />
+                        </Grid.RowDefinitions>
+
+                        <!-- Modal Header -->
+                        <Grid Grid.Row="0" Margin="0,0,0,14">
+                            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                <TextBlock Text="✨" FontSize="18" Margin="0,0,8,0" />
+                                <TextBlock Text="AI Tahlili va Xatoliklarni Tuzatish Natijasi" Foreground="#F8FAFC" FontWeight="Bold" FontSize="15" />
+                            </StackPanel>
+                            <Button Click="BtnCloseReviewModal_Click" HorizontalAlignment="Right" Style="{StaticResource GlassButton}" Content="✕" Padding="6,2" FontSize="12" />
+                        </Grid>
+
+                        <!-- Modal Content Preview -->
+                        <Border Grid.Row="1" Background="#0B1120" BorderBrush="#334155" BorderThickness="1" CornerRadius="10" Padding="10" Margin="0,0,0,14">
+                            <TextBox x:Name="TxtAiProofreadResult"
+                                     Background="Transparent" Foreground="#E2E8F0" BorderThickness="0"
+                                     FontFamily="Consolas, Cascadia Code, Segoe UI" FontSize="12"
+                                     AcceptsReturn="True" TextWrapping="Wrap"
+                                     VerticalScrollBarVisibility="Auto" />
+                        </Border>
+
+                        <!-- Modal Action Buttons -->
+                        <StackPanel Grid.Row="2" Orientation="Horizontal" HorizontalAlignment="Right">
+                            <Button Click="BtnCloseReviewModal_Click" Style="{StaticResource GlassButton}" Content="Bekor Qilish" Margin="0,0,10,0" Padding="14,6" />
+                            <Button Click="BtnApplyAiProofread_Click" Style="{StaticResource AccentButton}" Content="✅ Tasdiqlash va Hujjatga Qo'llash" Padding="16,6" FontWeight="Bold" />
+                        </StackPanel>
+                    </Grid>
+                </Border>
             </Border>
         </Grid>
     </Border>

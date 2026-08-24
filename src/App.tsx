@@ -17,10 +17,13 @@ import { MarkdownViewer } from "./components/MarkdownViewer";
 import { ApiDocsModal } from "./components/ApiDocsModal";
 import { SupportedFormatsModal } from "./components/SupportedFormatsModal";
 import { ApiKeyModal } from "./components/ApiKeyModal";
+import { AiProofreadModal } from "./components/AiProofreadModal";
 import { ConvertedItem, ConversionOptions, ThemeType } from "./types";
 import {
   convertFileClient,
   convertUrlClient,
+  convertWithGeminiApi,
+  convertWithOpenAiApi,
 } from "./services/converterService";
 
 export default function App() {
@@ -45,9 +48,13 @@ export default function App() {
   const [conversionProgress, setConversionProgress] = useState<{ current: number; total: number; filename: string } | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
+  // Modals state
   const [isApiDocsOpen, setIsApiDocsOpen] = useState(false);
   const [isFormatsOpen, setIsFormatsOpen] = useState(false);
   const [isApiKeyModalOpen, setIsApiKeyModalOpen] = useState(false);
+  const [isAiProofreadOpen, setIsAiProofreadOpen] = useState(false);
+  const [aiProofreadResult, setAiProofreadResult] = useState<string>("");
+  const [isProofreading, setIsProofreading] = useState(false);
 
   // Load saved state from localStorage
   useEffect(() => {
@@ -119,7 +126,7 @@ export default function App() {
     setSelectedFiles([]);
   };
 
-  // Multi-File Async Batch Converter without UI freezing or scroll jumping
+  // Multi-File Async Batch Converter
   const handleConvertFiles = async () => {
     if (selectedFiles.length === 0) return;
     setIsConverting(true);
@@ -133,7 +140,6 @@ export default function App() {
         const file = selectedFiles[i];
         setConversionProgress({ current: i + 1, total, filename: file.name });
 
-        // Yield to browser UI event loop
         await new Promise((resolve) => setTimeout(resolve, 20));
 
         try {
@@ -196,6 +202,57 @@ export default function App() {
 
   const activeItem = convertedItems.find((item) => item.id === activeItemId) || convertedItems[0];
 
+  // AI Proofreading flow
+  const handleTriggerAiProofread = async () => {
+    if (!activeItem || !activeItem.markdown) return;
+    if (aiProvider !== "Ollama" && (!apiKey || apiKey.trim().length === 0)) {
+      setIsApiKeyModalOpen(true);
+      return;
+    }
+
+    setIsProofreading(true);
+    setErrorMessage(null);
+
+    try {
+      const prompt = `Ushbu Markdown hujjatidagi barcha orfografik, grammatik xatoliklarni, buzilgan jadvallarni va Lotin/Krill chalkashliklarini (o'/ў, g'/ғ, sh/ш, ch/ч) to'liq to'g'rilab, toza va chiroyli Markdown qilib qaytar. Ortiqcha izohlarsiz, faqat to'g'rilangan yakuniy Markdownni ber.`;
+
+      let resultText = "";
+      const base64Text = btoa(unescape(encodeURIComponent(activeItem.markdown)));
+
+      if (aiProvider === "GoogleGemini") {
+        const res = await convertWithGeminiApi(base64Text, "text/plain", "document_review.md", apiKey, aiModel, prompt);
+        resultText = res.markdown;
+      } else if (aiProvider === "GroqAI") {
+        const res = await convertWithOpenAiApi(base64Text, "text/plain", "document_review.md", apiKey, "https://api.groq.com/openai/v1/chat/completions", aiModel, prompt);
+        resultText = res.markdown;
+      } else {
+        const res = await convertWithOpenAiApi(base64Text, "text/plain", "document_review.md", apiKey, customBaseUrl || "https://api.openai.com/v1/chat/completions", aiModel, prompt);
+        resultText = res.markdown;
+      }
+
+      setAiProofreadResult(resultText);
+      setIsAiProofreadOpen(true);
+    } catch (err: any) {
+      setErrorMessage(`AI tahlilida xatolik: ${err.message || err}`);
+    } finally {
+      setIsProofreading(false);
+    }
+  };
+
+  const handleApplyAiProofread = (correctedText: string) => {
+    if (!activeItem) return;
+    const updated = {
+      ...activeItem,
+      markdown: correctedText,
+      markdownSize: new Blob([correctedText]).size,
+      wordCount: correctedText.replace(/```[\s\S]*?```/g, "").replace(/[#*_`\[\]()]/g, " ").trim().match(/\S+/g)?.length || 0,
+      charCount: correctedText.length,
+      lineCount: correctedText.split("\n").length,
+    };
+
+    setConvertedItems((prev) => prev.map((item) => (item.id === activeItem.id ? updated : item)));
+  };
+
   return (
     <div
       className={`min-h-screen flex flex-col font-sans transition-colors duration-200 ${
@@ -232,6 +289,14 @@ export default function App() {
             >
               Yopish
             </button>
+          </div>
+        )}
+
+        {/* Proofreading Loader Banner */}
+        {isProofreading && (
+          <div className="mb-6 p-3 bg-indigo-950/70 border border-indigo-500/50 rounded-xl flex items-center space-x-3 text-indigo-200 animate-in fade-in">
+            <Loader2 className="w-4 h-4 animate-spin text-indigo-400 shrink-0" />
+            <span className="text-xs font-semibold">AI Markdown matnidagi xatoliklar va jadvallarni tekshirmoqda...</span>
           </div>
         )}
 
@@ -323,6 +388,8 @@ export default function App() {
               onDeleteItem={(id) => {
                 setConvertedItems((prev) => prev.filter((i) => i.id !== id));
               }}
+              onAiProofread={handleTriggerAiProofread}
+              theme={theme}
             />
           </div>
         </div>
@@ -344,6 +411,14 @@ export default function App() {
         currentKey={apiKey}
         currentProvider={aiProvider}
         currentModel={aiModel}
+      />
+      <AiProofreadModal
+        isOpen={isAiProofreadOpen}
+        onClose={() => setIsAiProofreadOpen(false)}
+        originalText={activeItem?.markdown || ""}
+        correctedText={aiProofreadResult}
+        onApply={handleApplyAiProofread}
+        theme={theme}
       />
     </div>
   );

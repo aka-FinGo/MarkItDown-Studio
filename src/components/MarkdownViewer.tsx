@@ -13,42 +13,55 @@ import {
   Sparkles,
   Clock,
   Trash2,
+  X,
+  Wand2,
 } from "lucide-react";
-import { ConvertedItem } from "../types";
+import { ConvertedItem, ThemeType } from "../types";
 
 interface MarkdownViewerProps {
+  item: ConvertedItem | undefined;
   items: ConvertedItem[];
-  activeId: string;
-  onSelectActive: (id: string) => void;
-  onUpdateMarkdown: (id: string, newMarkdown: string) => void;
+  activeItemId: string;
+  onSelectItem: (id: string) => void;
+  onClearHistory: () => void;
   onDeleteItem: (id: string) => void;
-  onClearAll: () => void;
+  onAiProofread?: () => void;
+  theme?: ThemeType;
 }
 
 export const MarkdownViewer: React.FC<MarkdownViewerProps> = ({
+  item,
   items,
-  activeId,
-  onSelectActive,
-  onUpdateMarkdown,
+  activeItemId,
+  onSelectItem,
+  onClearHistory,
   onDeleteItem,
-  onClearAll,
+  onAiProofread,
+  theme = "MidnightGlass",
 }) => {
-  const [viewMode, setViewMode] = useState<"split" | "preview" | "editor" | "stats">("split");
-  const [copiedType, setCopiedType] = useState<string | null>(null);
+  const [viewMode, setViewMode] = useState<"split" | "preview" | "editor">("split");
+  const [copied, setCopied] = useState(false);
 
-  const activeItem = items.find((item) => item.id === activeId) || items[0];
+  const activeItem = item || items.find((i) => i.id === activeItemId) || items[0];
 
-  if (!activeItem) return null;
+  if (!activeItem) {
+    return (
+      <div className="flex-1 flex flex-col items-center justify-center p-12 text-center rounded-2xl border border-zinc-800 bg-zinc-900/50 min-h-[400px]">
+        <div className="w-14 h-14 rounded-2xl bg-zinc-800 flex items-center justify-center text-zinc-500 mb-3">
+          <Sparkles className="w-7 h-7" />
+        </div>
+        <h3 className="text-base font-bold text-white mb-1">Markdown Ko'ruvchi Bo'sh</h3>
+        <p className="text-xs text-zinc-400 max-w-sm">
+          Chap tomondan fayl yuklang yoki web URL kiriting. Natija bu yerda toza Markdown formatida paydo bo'ladi.
+        </p>
+      </div>
+    );
+  }
 
-  const handleCopy = (type: "raw" | "llm") => {
-    let contentToCopy = activeItem.markdown;
-    if (type === "llm") {
-      contentToCopy = `<document filename="${activeItem.filename}" format="${activeItem.originalFormat}">\n${activeItem.markdown}\n</document>`;
-    }
-
-    navigator.clipboard.writeText(contentToCopy);
-    setCopiedType(type);
-    setTimeout(() => setCopiedType(null), 2000);
+  const handleCopy = () => {
+    navigator.clipboard.writeText(activeItem.markdown);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
   };
 
   const handleDownloadSingle = () => {
@@ -64,9 +77,9 @@ export const MarkdownViewer: React.FC<MarkdownViewerProps> = ({
 
   const handleDownloadAllZip = async () => {
     const zip = new JSZip();
-    for (const item of items) {
-      const safeName = item.filename.replace(/\.[^/.]+$/, "");
-      zip.file(`${safeName}.md`, item.markdown);
+    for (const it of items) {
+      const safeName = it.filename.replace(/\.[^/.]+$/, "");
+      zip.file(`${safeName}.md`, it.markdown);
     }
     const content = await zip.generateAsync({ type: "blob" });
     const url = URL.createObjectURL(content);
@@ -77,36 +90,53 @@ export const MarkdownViewer: React.FC<MarkdownViewerProps> = ({
     URL.revokeObjectURL(url);
   };
 
-  const formatFileSize = (bytes: number) => {
-    if (bytes < 1024) return `${bytes} B`;
-    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
-    return `${(bytes / (1024 * 1024)).toFixed(2)} MB`;
-  };
-
   return (
-    <div className="bg-white border border-zinc-200 rounded-2xl shadow-sm overflow-hidden flex flex-col">
+    <div
+      className={`border rounded-2xl shadow-sm overflow-hidden flex flex-col transition-all ${
+        theme === "ObsidianDark"
+          ? "bg-[#1e1e1e] border-zinc-800 text-zinc-100"
+          : theme === "CyberpunkNeon"
+          ? "bg-[#0a0f1e] border-cyan-500/40 text-cyan-50"
+          : theme === "FrostedCrystal"
+          ? "bg-white border-slate-200 text-slate-900"
+          : "bg-zinc-900 border-zinc-800 text-zinc-100"
+      }`}
+    >
       {/* File Navigation Tabs */}
-      <div className="bg-zinc-50 border-b border-zinc-200 px-4 py-2.5 flex items-center justify-between overflow-x-auto gap-2">
-        <div className="flex items-center space-x-1 overflow-x-auto py-1">
-          {items.map((item) => {
-            const isActive = item.id === activeItem.id;
+      <div className="bg-zinc-950/60 border-b border-zinc-800/80 px-3 py-2 flex items-center justify-between overflow-x-auto gap-2">
+        <div className="flex items-center space-x-1.5 overflow-x-auto py-0.5">
+          {items.map((it) => {
+            const isActive = it.id === activeItem.id;
             return (
-              <button
-                key={item.id}
-                onClick={() => onSelectActive(item.id)}
-                id={`tab-file-${item.id}`}
-                className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-medium transition-all whitespace-nowrap ${
+              <div
+                key={it.id}
+                className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium transition-all ${
                   isActive
-                    ? "bg-white text-zinc-900 shadow-sm border border-zinc-200 font-semibold"
-                    : "text-zinc-500 hover:text-zinc-800 hover:bg-zinc-100"
+                    ? "bg-indigo-600 text-white shadow-xs font-semibold"
+                    : "bg-zinc-800/80 text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800"
                 }`}
               >
-                <span className="truncate max-w-[150px]">{item.filename}</span>
-                <span className="text-[10px] px-1.5 py-0.2 rounded bg-zinc-100 text-zinc-600 font-mono">
-                  {item.originalFormat}
+                <button
+                  onClick={() => onSelectItem(it.id)}
+                  className="truncate max-w-[130px] cursor-pointer text-left"
+                >
+                  {it.filename}
+                </button>
+                <span className="text-[9px] px-1 py-0.2 rounded bg-black/30 font-mono opacity-80">
+                  {it.originalFormat}
                 </span>
-                {item.usedAi && <Sparkles className="w-3 h-3 text-indigo-500" />}
-              </button>
+                {/* Single item delete button */}
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onDeleteItem(it.id);
+                  }}
+                  className="p-0.5 rounded hover:bg-red-500/40 text-zinc-300 hover:text-red-200 transition-colors ml-0.5"
+                  title="Ushbu faylni o'chirish"
+                >
+                  <X className="w-3 h-3" />
+                </button>
+              </div>
             );
           })}
         </div>
@@ -115,184 +145,126 @@ export const MarkdownViewer: React.FC<MarkdownViewerProps> = ({
           {items.length > 1 && (
             <button
               onClick={handleDownloadAllZip}
-              id="btn-download-all-zip"
-              className="flex items-center gap-1 px-2.5 py-1 text-xs font-medium text-indigo-700 bg-indigo-50 hover:bg-indigo-100 rounded-lg border border-indigo-200/60 transition-colors"
+              className="flex items-center gap-1 px-2.5 py-1 text-xs font-medium text-indigo-300 bg-indigo-950/80 hover:bg-indigo-900 rounded-lg border border-indigo-500/40 transition-colors cursor-pointer"
             >
               <FileDown className="w-3.5 h-3.5" />
-              <span>Barchasini ZIP qilib yuklash</span>
+              <span className="hidden sm:inline">ZIP qilib yuklash</span>
             </button>
           )}
 
           <button
-            onClick={onClearAll}
-            id="btn-clear-viewer-items"
-            className="text-zinc-400 hover:text-red-600 p-1.5 rounded-lg hover:bg-red-50 transition-colors"
-            title="Barchasini o'chirish"
+            onClick={onClearHistory}
+            className="flex items-center gap-1 text-zinc-400 hover:text-red-400 px-2 py-1 text-xs rounded-lg hover:bg-red-950/40 border border-transparent hover:border-red-500/30 transition-colors cursor-pointer"
+            title="Barcha tarixni tozalash"
           >
             <Trash2 className="w-3.5 h-3.5" />
+            <span className="hidden sm:inline">Tozalash</span>
           </button>
         </div>
       </div>
 
       {/* Action Toolbar */}
-      <div className="p-3 sm:px-4 border-b border-zinc-200 bg-white flex flex-wrap items-center justify-between gap-3">
+      <div className="p-3 border-b border-zinc-800/80 flex flex-wrap items-center justify-between gap-3 bg-zinc-900/40">
         {/* Left: View Mode Switches */}
-        <div className="flex items-center bg-zinc-100 p-1 rounded-xl border border-zinc-200/80 text-xs">
+        <div className="flex items-center bg-zinc-800/80 p-0.5 rounded-xl border border-zinc-700/60 text-xs">
           <button
             onClick={() => setViewMode("split")}
-            id="btn-view-split"
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg font-medium transition-colors ${
-              viewMode === "split" ? "bg-white text-zinc-900 shadow-xs font-semibold" : "text-zinc-600 hover:text-zinc-900"
+            className={`flex items-center gap-1.5 px-3 py-1 rounded-lg font-medium transition-colors cursor-pointer ${
+              viewMode === "split" ? "bg-indigo-600 text-white shadow-xs" : "text-zinc-400 hover:text-zinc-200"
             }`}
           >
             <Columns className="w-3.5 h-3.5" />
-            <span className="hidden sm:inline">Yonma-yon (Split)</span>
+            <span className="hidden sm:inline">Split</span>
           </button>
 
           <button
             onClick={() => setViewMode("preview")}
-            id="btn-view-preview"
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg font-medium transition-colors ${
-              viewMode === "preview" ? "bg-white text-zinc-900 shadow-xs font-semibold" : "text-zinc-600 hover:text-zinc-900"
+            className={`flex items-center gap-1.5 px-3 py-1 rounded-lg font-medium transition-colors cursor-pointer ${
+              viewMode === "preview" ? "bg-indigo-600 text-white shadow-xs" : "text-zinc-400 hover:text-zinc-200"
             }`}
           >
             <Eye className="w-3.5 h-3.5" />
-            <span>Ko'rinish (Preview)</span>
+            <span>Preview</span>
           </button>
 
           <button
             onClick={() => setViewMode("editor")}
-            id="btn-view-editor"
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg font-medium transition-colors ${
-              viewMode === "editor" ? "bg-white text-zinc-900 shadow-xs font-semibold" : "text-zinc-600 hover:text-zinc-900"
+            className={`flex items-center gap-1.5 px-3 py-1 rounded-lg font-medium transition-colors cursor-pointer ${
+              viewMode === "editor" ? "bg-indigo-600 text-white shadow-xs" : "text-zinc-400 hover:text-zinc-200"
             }`}
           >
             <Edit3 className="w-3.5 h-3.5" />
-            <span>Matn Tahrirlagich</span>
+            <span>Editor</span>
           </button>
         </div>
 
-        {/* Right: Actions (Download .md, Copy) */}
+        {/* Right: Actions */}
         <div className="flex items-center space-x-2">
+          {onAiProofread && (
+            <button
+              onClick={onAiProofread}
+              className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-indigo-300 bg-indigo-950/80 hover:bg-indigo-900 rounded-xl border border-indigo-500/50 transition-all cursor-pointer shadow-xs"
+              title="Grammatika, jadvallar va shrift xatoliklarini AI orqali tekshirish"
+            >
+              <Sparkles className="w-3.5 h-3.5 text-indigo-400" />
+              <span>AI Bilan Tekshirish</span>
+            </button>
+          )}
+
           <button
-            onClick={() => handleCopy("raw")}
-            id="btn-copy-raw-markdown"
-            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-zinc-700 bg-zinc-100 hover:bg-zinc-200/80 rounded-lg transition-colors border border-zinc-200/80"
+            onClick={handleCopy}
+            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-zinc-300 bg-zinc-800 hover:bg-zinc-700 rounded-xl transition-colors border border-zinc-700 cursor-pointer"
           >
-            {copiedType === "raw" ? <Check className="w-3.5 h-3.5 text-emerald-600" /> : <Copy className="w-3.5 h-3.5" />}
-            <span>{copiedType === "raw" ? "Nusxalandi!" : "Nusxa olish"}</span>
+            {copied ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
+            <span>{copied ? "Nusxalandi!" : "Nusxa olish"}</span>
           </button>
 
           <button
             onClick={handleDownloadSingle}
-            id="btn-download-md-file"
-            className="flex items-center gap-1.5 px-4 py-1.5 text-xs font-semibold text-white bg-indigo-600 hover:bg-indigo-700 rounded-lg shadow-sm shadow-indigo-600/20 transition-colors"
+            className="flex items-center gap-1.5 px-3.5 py-1.5 text-xs font-bold text-white bg-indigo-600 hover:bg-indigo-500 rounded-xl shadow-xs transition-colors cursor-pointer"
           >
             <Download className="w-3.5 h-3.5" />
-            <span>.md Faylni Yuklab Olish</span>
+            <span>.md Saqlash</span>
           </button>
         </div>
       </div>
 
       {/* Info Stats Bar */}
-      <div className="px-4 py-2 bg-zinc-50/50 border-b border-zinc-100 flex flex-wrap items-center justify-between text-xs text-zinc-500 gap-2">
-        <div className="flex items-center space-x-3">
-          <span className="font-mono text-zinc-700 font-semibold">{activeItem.filename}</span>
+      <div className="px-4 py-1.5 bg-zinc-950/40 border-b border-zinc-800/60 flex flex-wrap items-center justify-between text-[11px] text-zinc-400 gap-2">
+        <div className="flex items-center space-x-2">
+          <span className="font-mono text-zinc-200 font-semibold">{activeItem.filename}</span>
           <span>•</span>
           <span>{activeItem.wordCount.toLocaleString()} ta so'z</span>
           <span>•</span>
-          <span>{activeItem.lineCount} qator</span>
-          <span>•</span>
-          <span>{formatFileSize(activeItem.markdownSize)}</span>
+          <span>{activeItem.charCount.toLocaleString()} ta belgi</span>
         </div>
-
-        <div className="flex items-center space-x-2">
-          {activeItem.usedAi ? (
-            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-indigo-50 text-indigo-700 font-medium text-[11px] border border-indigo-200">
-              <Sparkles className="w-3 h-3 text-indigo-500" />
-              AI Multimodal (OCR / Audio)
-            </span>
-          ) : (
-            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-emerald-50 text-emerald-700 font-medium text-[11px] border border-emerald-200">
-              <Check className="w-3 h-3 text-emerald-600" />
-              0 AI Token (Lokal)
-            </span>
-          )}
-
-          <span className="inline-flex items-center gap-1 text-[11px] text-zinc-400 font-mono">
-            <Clock className="w-3 h-3" />
-            {activeItem.durationMs}ms
-          </span>
+        <div className="flex items-center space-x-2 text-zinc-500">
+          <Clock className="w-3 h-3" />
+          <span>{activeItem.durationMs} ms</span>
+          <span>•</span>
+          <span>{activeItem.engine || "Local"}</span>
         </div>
       </div>
 
-      {/* Main Workspace Body */}
-      <div className="flex-1 min-h-[480px]">
-        {/* Split View */}
-        {viewMode === "split" && (
-          <div className="grid grid-cols-1 md:grid-cols-2 divide-y md:divide-y-0 md:divide-x divide-zinc-200 min-h-[480px]">
-            {/* Raw Editor */}
-            <div className="flex flex-col bg-zinc-900 text-zinc-100">
-              <div className="px-4 py-2 border-b border-zinc-800 flex items-center justify-between bg-zinc-950/40 text-[11px] text-zinc-400">
-                <span className="font-mono">Xom Markdown Tahrirlagich (.md)</span>
-                <span>O'zgartirishlar avtomatik saqlanadi</span>
-              </div>
-              <textarea
-                id="textarea-active-markdown-split"
-                value={activeItem.markdown}
-                onChange={(e) => onUpdateMarkdown(activeItem.id, e.target.value)}
-                className="flex-1 p-4 font-mono text-xs bg-transparent text-zinc-100 focus:outline-none resize-none leading-relaxed selection:bg-indigo-500 selection:text-white"
-                rows={22}
-                placeholder="Markdown matni shu yerda bo'ladi..."
-              />
-            </div>
-
-            {/* Rendered Preview */}
-            <div className="flex flex-col bg-white overflow-y-auto max-h-[600px]">
-              <div className="px-4 py-2 border-b border-zinc-100 flex items-center justify-between bg-zinc-50/60 text-[11px] text-zinc-500">
-                <span>Jonli Ko'rinish (Formatted Preview)</span>
-                <span className="text-zinc-400 font-mono">GitHub Flavored Markdown</span>
-              </div>
-              <div className="p-6 overflow-y-auto">
-                <div className="markdown-body">
-                  <ReactMarkdown remarkPlugins={[remarkGfm]}>
-                    {activeItem.markdown}
-                  </ReactMarkdown>
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Preview Only */}
-        {viewMode === "preview" && (
-          <div className="p-6 sm:p-8 bg-white min-h-[480px] max-h-[700px] overflow-y-auto">
-            <div className="max-w-4xl mx-auto markdown-body">
-              <ReactMarkdown remarkPlugins={[remarkGfm]}>
-                {activeItem.markdown}
-              </ReactMarkdown>
-            </div>
-          </div>
-        )}
-
-        {/* Editor Only */}
-        {viewMode === "editor" && (
-          <div className="flex flex-col bg-zinc-900 text-zinc-100 min-h-[480px]">
-            <div className="px-4 py-2 border-b border-zinc-800 flex items-center justify-between bg-zinc-950/40 text-xs text-zinc-400">
-              <span className="font-mono">{activeItem.filename} — Markdown Matni</span>
-              <button
-                onClick={handleDownloadSingle}
-                className="text-indigo-400 hover:text-indigo-300 font-medium"
-              >
-                .md Faylni Yuklab Olish
-              </button>
-            </div>
+      {/* Viewer Content Area */}
+      <div className="flex-1 min-h-[450px] max-h-[620px] overflow-hidden flex">
+        {/* Editor Pane */}
+        {(viewMode === "split" || viewMode === "editor") && (
+          <div className={`flex-1 p-4 overflow-y-auto ${viewMode === "split" ? "border-r border-zinc-800" : ""}`}>
             <textarea
-              id="textarea-active-markdown-full"
               value={activeItem.markdown}
-              onChange={(e) => onUpdateMarkdown(activeItem.id, e.target.value)}
-              className="flex-1 p-6 font-mono text-xs bg-transparent text-zinc-100 focus:outline-none resize-none leading-relaxed selection:bg-indigo-500 selection:text-white min-h-[500px]"
+              readOnly
+              className="w-full h-full bg-transparent font-mono text-xs text-zinc-200 resize-none focus:outline-none leading-relaxed"
             />
+          </div>
+        )}
+
+        {/* Rendered Preview Pane */}
+        {(viewMode === "split" || viewMode === "preview") && (
+          <div className="flex-1 p-5 overflow-y-auto prose prose-invert prose-zinc max-w-none text-xs leading-relaxed">
+            <ReactMarkdown remarkPlugins={[remarkGfm]}>
+              {activeItem.markdown}
+            </ReactMarkdown>
           </div>
         )}
       </div>

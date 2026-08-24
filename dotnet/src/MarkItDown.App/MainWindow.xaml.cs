@@ -6,6 +6,7 @@ using System.Windows.Input;
 using System.Windows.Media;
 using Microsoft.Win32;
 using MarkItDown.Core;
+using MarkItDown.Core.Ai;
 using MarkItDown.Core.Models;
 
 namespace MarkItDown.App;
@@ -13,6 +14,7 @@ namespace MarkItDown.App;
 public partial class MainWindow : Window
 {
     private readonly MarkItDownEngine _engine;
+    private readonly UniversalAiClient _aiClient;
     private readonly AppConfig _config;
     public ObservableCollection<ConversionResult> ConvertedItems { get; } = new();
     private ConversionResult? _activeResult;
@@ -22,6 +24,7 @@ public partial class MainWindow : Window
     {
         InitializeComponent();
         _engine = new MarkItDownEngine();
+        _aiClient = new UniversalAiClient();
         _config = AppConfig.Load();
         LstConvertedItems.ItemsSource = ConvertedItems;
 
@@ -90,7 +93,7 @@ public partial class MainWindow : Window
 - **Ollama:** `llama3.2-vision`, `llava`, `qwen2.5-vl`
 
 ## 3. Smart Fallback (Avtomatik o'tish)
-- Agar tanlangan modelning limiti (Rate Limit) tugasa yoki band bo'lsa, tizim avtomatik zaxira modelga o'tib, konvertatsiyani to'xtovsiz davom ettiradi!
+- Agar tanlangan modelning limiti tugasa yoki band bo'lsa, tizim avtomatik zaxira modelga o'tib, konvertatsiyani to'xtovsiz davom ettiradi!
 ";
         TxtMarkdownEditor.Text = welcomeMd;
     }
@@ -110,7 +113,7 @@ public partial class MainWindow : Window
 
     private void BtnClose_Click(object sender, RoutedEventArgs e) => Close();
 
-    // Theme Switcher
+    // Theme Switcher & Modal Adaptation
     private void CmbTheme_SelectionChanged(object sender, SelectionChangedEventArgs e)
     {
         if (CmbTheme.SelectedItem is ComboBoxItem item)
@@ -141,6 +144,11 @@ public partial class MainWindow : Window
                 EditorContainerBorder.Background = new SolidColorBrush(Color.FromRgb(24, 24, 24));
                 EditorInnerBorder.Background = new SolidColorBrush(Color.FromRgb(16, 16, 16));
                 FooterBorder.Background = new SolidColorBrush(Color.FromRgb(20, 20, 20));
+                if (ModalDialogBorder != null)
+                {
+                    ModalDialogBorder.Background = new SolidColorBrush(Color.FromRgb(28, 28, 28));
+                    ModalDialogBorder.BorderBrush = new SolidColorBrush(Color.FromRgb(168, 85, 247));
+                }
                 break;
 
             case "CyberpunkNeon":
@@ -155,6 +163,11 @@ public partial class MainWindow : Window
                 EditorContainerBorder.Background = new SolidColorBrush(Color.FromRgb(15, 23, 42));
                 EditorInnerBorder.Background = new SolidColorBrush(Color.FromRgb(2, 6, 23));
                 FooterBorder.Background = new SolidColorBrush(Color.FromRgb(5, 8, 17));
+                if (ModalDialogBorder != null)
+                {
+                    ModalDialogBorder.Background = new SolidColorBrush(Color.FromRgb(10, 15, 30));
+                    ModalDialogBorder.BorderBrush = new SolidColorBrush(Color.FromRgb(6, 182, 212));
+                }
                 break;
 
             case "FrostedCrystal":
@@ -172,6 +185,11 @@ public partial class MainWindow : Window
                 TxtAppTitle.Foreground = new SolidColorBrush(Color.FromRgb(15, 23, 42));
                 TxtDocTitle.Foreground = new SolidColorBrush(Color.FromRgb(15, 23, 42));
                 TxtMarkdownEditor.Foreground = new SolidColorBrush(Color.FromRgb(30, 41, 59));
+                if (ModalDialogBorder != null)
+                {
+                    ModalDialogBorder.Background = new SolidColorBrush(Color.FromRgb(255, 255, 255));
+                    ModalDialogBorder.BorderBrush = new SolidColorBrush(Color.FromRgb(59, 130, 246));
+                }
                 break;
 
             default: // MidnightGlass
@@ -189,6 +207,11 @@ public partial class MainWindow : Window
                 TxtAppTitle.Foreground = new SolidColorBrush(Color.FromRgb(248, 250, 252));
                 TxtDocTitle.Foreground = new SolidColorBrush(Color.FromRgb(248, 250, 252));
                 TxtMarkdownEditor.Foreground = new SolidColorBrush(Color.FromRgb(226, 232, 240));
+                if (ModalDialogBorder != null)
+                {
+                    ModalDialogBorder.Background = new SolidColorBrush(Color.FromRgb(30, 41, 59));
+                    ModalDialogBorder.BorderBrush = new SolidColorBrush(Color.FromRgb(99, 102, 241));
+                }
                 break;
         }
     }
@@ -435,10 +458,99 @@ public partial class MainWindow : Window
         }
     }
 
+    // 1. Delete Single Item from History
+    private void BtnDeleteSingleItem_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is Button btn && btn.Tag is ConversionResult item)
+        {
+            ConvertedItems.Remove(item);
+            if (_activeResult == item)
+            {
+                if (ConvertedItems.Count > 0)
+                {
+                    SetActiveResult(ConvertedItems[0]);
+                }
+                else
+                {
+                    LoadDefaultSample();
+                }
+            }
+            TxtStatus.Text = $"\"{item.FileName}\" ro'yxatdan o'chirildi.";
+        }
+    }
+
+    // 2. Clear All History
     private void BtnClearHistory_Click(object sender, RoutedEventArgs e)
     {
-        ConvertedItems.Clear();
-        LoadDefaultSample();
+        if (ConvertedItems.Count == 0) return;
+        var res = MessageBox.Show("Haqiqatan ham barcha o'girilgan fayllar tarixini tozalamoqchimisiz?", "Tarixni tozalash", MessageBoxButton.YesNo, MessageBoxImage.Question);
+        if (res == MessageBoxResult.Yes)
+        {
+            ConvertedItems.Clear();
+            LoadDefaultSample();
+            TxtStatus.Text = "Barcha tarix tozalandi.";
+        }
+    }
+
+    // 3. AI Proofreader / Error Fixer
+    private async void BtnAiProofread_Click(object sender, RoutedEventArgs e)
+    {
+        var currentText = TxtMarkdownEditor.Text?.Trim();
+        if (string.IsNullOrEmpty(currentText))
+        {
+            MessageBox.Show("Tekshirish uchun Markdown matni mavjud emas.", "Xabar", MessageBoxButton.OK, MessageBoxImage.Information);
+            return;
+        }
+
+        var aiConfig = GetCurrentAiConfig();
+        if (aiConfig.Provider != AiProvider.Ollama && string.IsNullOrWhiteSpace(aiConfig.ApiKey))
+        {
+            MessageBox.Show("AI orqali tekshirish uchun yuqoridagi 'API Kalit' maydoniga kalitingizni kiriting.", "API Kalit Talab Qilinadi", MessageBoxButton.OK, MessageBoxImage.Warning);
+            return;
+        }
+
+        TxtStatus.Text = "AI Markdown matnidagi xatoliklar va jadvallarni tekshirmoqda...";
+        try
+        {
+            var prompt = @"Ushbu Markdown hujjatidagi barcha orfografik, grammatik xatoliklarni, buzilgan jadvallarni va Lotin/Krill chalkashliklarini (o'/ў, g'/ғ, sh/ш, ch/ч) to'liq to'g'rilab, toza va chiroyli Markdown qilib qaytar. Ortiqcha izohlarsiz, faqat to'g'rilangan yakuniy Markdownni ber.";
+            var rawBytes = System.Text.Encoding.UTF8.GetBytes(currentText);
+
+            var (correctedMd, _) = await _aiClient.ConvertWithAiAsync(rawBytes, "text/plain", "document_review.md", aiConfig, prompt);
+
+            TxtAiProofreadResult.Text = correctedMd;
+            PnlAiReviewModal.Visibility = Visibility.Visible;
+            TxtStatus.Text = "AI tahlili yakunlandi! Natijani ko'rib chiqishingiz mumkin.";
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show($"AI tekshirishida xatolik:\n{ex.Message}", "Xatolik", MessageBoxButton.OK, MessageBoxImage.Error);
+            TxtStatus.Text = "Xatolik yuz berdi.";
+        }
+    }
+
+    private void BtnCloseReviewModal_Click(object sender, RoutedEventArgs e)
+    {
+        PnlAiReviewModal.Visibility = Visibility.Collapsed;
+    }
+
+    private void BtnApplyAiProofread_Click(object sender, RoutedEventArgs e)
+    {
+        var corrected = TxtAiProofreadResult.Text;
+        if (!string.IsNullOrEmpty(corrected))
+        {
+            TxtMarkdownEditor.Text = corrected;
+            if (_activeResult != null)
+            {
+                _activeResult.Markdown = corrected;
+                _activeResult.WordCount = MarkItDownEngine.CountWords(corrected);
+                _activeResult.CharCount = corrected.Length;
+                _activeResult.EstimatedTokens = MarkItDownEngine.EstimateTokens(corrected);
+                TxtDocStats.Text = $"Format: {_activeResult.OriginalFormat} • {_activeResult.WordCount:N0} ta so'z • {_activeResult.CharCount:N0} ta belgi (AI bilan tekshirildi)";
+            }
+            PnlAiReviewModal.Visibility = Visibility.Collapsed;
+            TxtStatus.Text = "AI tuzatishlari hujjatga muvaffaqiyatli qo'llandi!";
+            MessageBox.Show("Markdown hujjati AI tuzatishlari bilan muvaffaqiyatli yangilandi!", "Muvaffaqiyatli", MessageBoxButton.OK, MessageBoxImage.Information);
+        }
     }
 
     private void BtnCopyMarkdown_Click(object sender, RoutedEventArgs e)
