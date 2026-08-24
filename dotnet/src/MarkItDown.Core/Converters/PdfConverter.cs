@@ -25,7 +25,7 @@ public class PdfConverter
         var sb = new StringBuilder();
         var totalPages = 0;
         var hasSufficientText = false;
-        var pageTextList = new List<(int PageNumber, string Text)>();
+        var pageTextList = new List<(int PageNumber, string Text, int ImageCount)>();
 
         try
         {
@@ -36,7 +36,8 @@ public class PdfConverter
             {
                 var page = document.GetPage(i);
                 var pageText = ExtractFormattedPageText(page);
-                pageTextList.Add((i, pageText));
+                var imageCount = page.GetImages().Count();
+                pageTextList.Add((i, pageText, imageCount));
 
                 if (pageText.Length > 30)
                 {
@@ -46,7 +47,7 @@ public class PdfConverter
         }
         catch (Exception ex)
         {
-            // If PDF reading fails and AI is configured, fallback to AI
+            // If local PDF parser fails and AI is configured, fallback to AI Multimodal
             if (options.EnableAi && aiConfig != null && !string.IsNullOrWhiteSpace(aiConfig.ApiKey))
             {
                 var (aiResult, _) = await _aiClient.ConvertWithAiAsync(pdfBytes, "application/pdf", fileName, aiConfig, options.CustomPrompt, ct);
@@ -56,18 +57,53 @@ public class PdfConverter
             throw new InvalidOperationException($"PDF faylni o'qishda xatolik: {ex.Message}", ex);
         }
 
-        // SMART SCANNED DETECTION:
-        // Agar PDF skanerlangan (matn qatlami bo'sh yoki 3 ta sahifadan faqat sahifa raqamlari chiqqan) bo'lsa:
-        if ((!hasSufficientText || pageTextList.All(p => p.Text.Length < 30)) && options.EnableAi && aiConfig != null && !string.IsNullOrWhiteSpace(aiConfig.ApiKey))
+        // SMART SCANNED / IMAGE-ONLY PDF DETECTION:
+        // Agar PDF skanerlangan (matn qatlami bo'sh yoki har bir sahifada < 30 belgi) bo'lsa:
+        var isScannedPdf = !hasSufficientText || pageTextList.All(p => p.Text.Length < 30);
+
+        if (isScannedPdf)
         {
-            var (aiResult, _) = await _aiClient.ConvertWithAiAsync(pdfBytes, "application/pdf", fileName, aiConfig, options.CustomPrompt, ct);
-            return aiResult;
+            if (options.EnableAi && aiConfig != null && !string.IsNullOrWhiteSpace(aiConfig.ApiKey))
+            {
+                // Send directly to Multimodal Vision AI (Gemini / OpenAI / Claude / Ollama)
+                var (aiResult, _) = await _aiClient.ConvertWithAiAsync(pdfBytes, "application/pdf", fileName, aiConfig, options.CustomPrompt, ct);
+                return aiResult;
+            }
+            else
+            {
+                sb.AppendLine($"# {Path.GetFileNameWithoutExtension(fileName)}");
+                sb.AppendLine();
+                sb.AppendLine("> ⚠️ **DIQQAT: Ushbu PDF fayl skanerlangan tasvirlardan iborat (raqamli matn qatlami mavjud emas).**");
+                sb.AppendLine(">");
+                sb.AppendLine("> Skanerlangan rasmlardagi barcha matnlarni (OCR) 100% aniqlikda o'qib, Markdown qilish uchun:");
+                sb.AppendLine("> 1. Yuqoridagi **'AI Provayder'** (masalan: Google Gemini, OpenAI, Claude yoki DeepSeek) ni tanlang.");
+                sb.AppendLine("> 2. **API Kalit** maydoniga o'z kalitingizni kiriting.");
+                sb.AppendLine("> 3. Faylni qayta yuklang — sun'iy intellekt barcha sahifalardagi matn va jadvallarni to'liq o'qib beradi.");
+                sb.AppendLine();
+                sb.AppendLine("---");
+                sb.AppendLine();
+
+                for (var i = 1; i <= totalPages; i++)
+                {
+                    sb.AppendLine($"## Sahifa {i}");
+                    sb.AppendLine();
+                    sb.AppendLine("*(Skanerlangan tasvir — matnni OCR orqali o'qish uchun AI kalit kiriting)*");
+                    sb.AppendLine();
+                    if (i < totalPages)
+                    {
+                        sb.AppendLine("---");
+                        sb.AppendLine();
+                    }
+                }
+
+                return sb.ToString().Trim();
+            }
         }
 
-        // Build clean Markdown from extracted pages
+        // Standard text-based PDF: format pages cleanly
         for (var idx = 0; idx < pageTextList.Count; idx++)
         {
-            var (pageNum, text) = pageTextList[idx];
+            var (pageNum, text, _) = pageTextList[idx];
 
             if (totalPages > 1)
             {
@@ -78,11 +114,6 @@ public class PdfConverter
             if (!string.IsNullOrWhiteSpace(text))
             {
                 sb.AppendLine(text);
-                sb.AppendLine();
-            }
-            else
-            {
-                sb.AppendLine("*(Ushbu sahifada matn qatlami topilmadi — skanerlangan tasvir bo'lishi mumkin)*");
                 sb.AppendLine();
             }
 
@@ -140,7 +171,6 @@ public class PdfConverter
     {
         if (string.IsNullOrWhiteSpace(line)) return;
 
-        // Auto detect headings (e.g. ALL CAPS or short title)
         if (line.Length < 60 && line == line.ToUpperInvariant() && line.Any(char.IsLetter) && !line.EndsWith("."))
         {
             sb.AppendLine();
