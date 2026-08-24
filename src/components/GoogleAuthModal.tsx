@@ -1,6 +1,12 @@
-import React, { useState, useEffect } from "react";
-import { X, LogIn, LogOut, User, CheckCircle2, ShieldCheck, ExternalLink } from "lucide-react";
+import React, { useState, useEffect, useRef } from "react";
+import { X, LogOut, User, CheckCircle2, ShieldCheck, Key, Settings2 } from "lucide-react";
 import { UserProfile } from "../types";
+
+declare global {
+  interface Window {
+    google?: any;
+  }
+}
 
 interface GoogleAuthModalProps {
   isOpen: boolean;
@@ -17,20 +23,79 @@ export const GoogleAuthModal: React.FC<GoogleAuthModalProps> = ({
   onLogin,
   onLogout,
 }) => {
-  const [customName, setCustomName] = useState("");
-  const [customEmail, setCustomEmail] = useState("");
+  const [googleClientId, setGoogleClientId] = useState<string>(() => {
+    return localStorage.getItem("markitdown_google_client_id") || "1056586071477-d4j85g7u8hbgmvd9m9j1n520eav4m61r.apps.googleusercontent.com";
+  });
+  const [showConfig, setShowConfig] = useState(false);
+  const googleBtnRef = useRef<HTMLDivElement>(null);
+
+  // Decode JWT from Google Credential Response
+  const parseJwt = (token: string) => {
+    try {
+      const base64Url = token.split(".")[1];
+      const base64 = base64Url.replace(/-/g, "+").replace(/_/g, "/");
+      const jsonPayload = decodeURIComponent(
+        atob(base64)
+          .split("")
+          .map((c) => "%" + ("00" + c.charCodeAt(0).toString(16)).slice(-2))
+          .join("")
+      );
+      return JSON.parse(jsonPayload);
+    } catch (e) {
+      console.error("JWT dekodlashda xatolik:", e);
+      return null;
+    }
+  };
+
+  const handleCredentialResponse = (response: any) => {
+    if (response?.credential) {
+      const payload = parseJwt(response.credential);
+      if (payload) {
+        const realUser: UserProfile = {
+          id: payload.sub || `google_${Date.now()}`,
+          name: payload.name || payload.given_name || "Google Foydalanuvchi",
+          email: payload.email || "",
+          picture: payload.picture || "https://lh3.googleusercontent.com/a/default-user=s96-c",
+        };
+        onLogin(realUser);
+        onClose();
+      }
+    }
+  };
+
+  // Render official Google Sign In Button
+  useEffect(() => {
+    if (isOpen && !user && window.google?.accounts?.id) {
+      try {
+        window.google.accounts.id.initialize({
+          client_id: googleClientId,
+          callback: handleCredentialResponse,
+          auto_select: false,
+        });
+
+        if (googleBtnRef.current) {
+          googleBtnRef.current.innerHTML = "";
+          window.google.accounts.id.renderButton(googleBtnRef.current, {
+            theme: "outline",
+            size: "large",
+            width: "360",
+            text: "signin_with",
+            shape: "pill",
+            logo_alignment: "left",
+          });
+        }
+      } catch (err) {
+        console.warn("Google GIS ishga tushirishda ogohlantirish:", err);
+      }
+    }
+  }, [isOpen, user, googleClientId]);
 
   if (!isOpen) return null;
 
-  const handleSimulateGoogleLogin = () => {
-    const demoUser: UserProfile = {
-      id: "google_" + Date.now(),
-      name: customName || "Google Foydalanuvchi",
-      email: customEmail || "user@gmail.com",
-      picture: "https://lh3.googleusercontent.com/a/default-user=s96-c",
-    };
-    onLogin(demoUser);
-    onClose();
+  const handleSaveClientId = (newId: string) => {
+    setGoogleClientId(newId);
+    localStorage.setItem("markitdown_google_client_id", newId);
+    setShowConfig(false);
   };
 
   return (
@@ -43,8 +108,8 @@ export const GoogleAuthModal: React.FC<GoogleAuthModalProps> = ({
               <User className="w-4 h-4" />
             </div>
             <div>
-              <h3 className="text-sm font-bold text-zinc-900">Google Hisobi bilan Kirish</h3>
-              <p className="text-[11px] text-zinc-500">Google OAuth 2.0 Integratsiyasi</p>
+              <h3 className="text-sm font-bold text-zinc-900">Google OAuth 2.0 Bilan Kirish</h3>
+              <p className="text-[11px] text-zinc-500">Haqiqiy Google hisobingiz bilan avtorizatsiya</p>
             </div>
           </div>
           <button
@@ -56,83 +121,96 @@ export const GoogleAuthModal: React.FC<GoogleAuthModalProps> = ({
         </div>
 
         {user ? (
-          // Logged in state
+          // Logged in state: Display Real User Profile
           <div className="space-y-4">
-            <div className="flex items-center space-x-3 p-3.5 bg-emerald-50 rounded-xl border border-emerald-200/80">
+            <div className="flex items-center space-x-3.5 p-3.5 bg-emerald-50/90 rounded-2xl border border-emerald-200/80">
               <img
                 src={user.picture}
                 alt={user.name}
-                className="w-12 h-12 rounded-full border-2 border-emerald-500 shadow-xs"
+                className="w-13 h-13 rounded-full border-2 border-emerald-500 shadow-sm object-cover"
               />
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-1.5">
-                  <h4 className="text-xs font-bold text-zinc-900 truncate">{user.name}</h4>
-                  <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                  <h4 className="text-sm font-bold text-zinc-900 truncate">{user.name}</h4>
+                  <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
                 </div>
-                <p className="text-[11px] text-zinc-600 truncate">{user.email}</p>
-                <span className="inline-block mt-0.5 text-[10px] bg-emerald-600 text-white px-1.5 py-0.2 rounded font-medium">
-                  Faol Sessiya
-                </span>
+                <p className="text-xs text-zinc-600 truncate">{user.email}</p>
+                <div className="mt-1 flex items-center gap-1">
+                  <span className="text-[10px] bg-emerald-600 text-white px-2 py-0.5 rounded-full font-medium">
+                    Google Bilan Tasdiqlangan
+                  </span>
+                </div>
               </div>
             </div>
 
-            <div className="flex items-center justify-end space-x-2 pt-2 border-t border-zinc-100">
-              <button
-                onClick={onClose}
-                className="px-4 py-2 text-xs font-semibold text-zinc-600 hover:bg-zinc-100 rounded-xl"
-              >
-                Yopish
-              </button>
-              <button
-                onClick={() => {
-                  onLogout();
-                  onClose();
-                }}
-                className="flex items-center gap-1.5 px-4 py-2 text-xs font-semibold bg-red-50 text-red-700 hover:bg-red-100 rounded-xl transition-all"
-              >
-                <LogOut className="w-3.5 h-3.5" />
-                <span>Chiqish</span>
-              </button>
+            <div className="flex items-center justify-between pt-2 border-t border-zinc-100">
+              <span className="text-[11px] text-zinc-400">ID: {user.id.substring(0, 14)}...</span>
+              <div className="flex items-center space-x-2">
+                <button
+                  onClick={onClose}
+                  className="px-4 py-2 text-xs font-semibold text-zinc-600 hover:bg-zinc-100 rounded-xl"
+                >
+                  Yopish
+                </button>
+                <button
+                  onClick={() => {
+                    onLogout();
+                    onClose();
+                  }}
+                  className="flex items-center gap-1.5 px-4 py-2 text-xs font-semibold bg-red-50 text-red-700 hover:bg-red-100 rounded-xl transition-all cursor-pointer"
+                >
+                  <LogOut className="w-3.5 h-3.5" />
+                  <span>Hisobdan Chiqish</span>
+                </button>
+              </div>
             </div>
           </div>
         ) : (
-          // Not logged in state
+          // Not logged in: Official Google Sign-In Button
           <div className="space-y-4">
-            <div className="p-3 bg-zinc-50 rounded-xl border border-zinc-200/60 text-xs text-zinc-600 space-y-2">
+            <div className="p-3 bg-zinc-50 rounded-xl border border-zinc-200/60 text-xs text-zinc-600 space-y-1.5">
               <div className="flex items-center gap-2 text-indigo-700 font-semibold">
                 <ShieldCheck className="w-4 h-4" />
-                <span>Xavfsiz Google Identifikatsiyasi:</span>
+                <span>Google OAuth 2.0 Xavfsiz Kirish:</span>
               </div>
-              <p className="text-[11px]">
-                Google hisobingiz orqali tizimga kirib, barcha saqlangan sozlamalar va konvertatsiyalarni o'zingizga biriktirishingiz mumkin.
+              <p className="text-[11px] leading-relaxed">
+                Tizimga kirish orqali siz o'zingizning haqiqiy Google profilingiz (ism, familiya, rasm va email) bilan ulanasiz.
               </p>
             </div>
 
-            {/* Quick One-Click Google Login */}
-            <button
-              onClick={handleSimulateGoogleLogin}
-              className="w-full flex items-center justify-center gap-2.5 py-2.5 px-4 bg-white hover:bg-zinc-50 border border-zinc-300 rounded-xl shadow-xs text-xs font-bold text-zinc-700 transition-all hover:border-zinc-400 cursor-pointer"
-            >
-              <svg className="w-4 h-4" viewBox="0 0 24 24">
-                <path
-                  fill="#4285F4"
-                  d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
-                />
-                <path
-                  fill="#34A853"
-                  d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"
-                />
-                <path
-                  fill="#FBBC05"
-                  d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z"
-                />
-                <path
-                  fill="#EA4335"
-                  d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z"
-                />
-              </svg>
-              <span>Google orqali Kirish</span>
-            </button>
+            {/* Official Google Identity Services Button Container */}
+            <div className="flex flex-col items-center justify-center py-2 min-h-[50px]">
+              <div ref={googleBtnRef} className="w-full flex justify-center" />
+            </div>
+
+            {/* Google Client ID Settings Drawer */}
+            <div className="pt-2 border-t border-zinc-100">
+              <button
+                onClick={() => setShowConfig(!showConfig)}
+                className="flex items-center gap-1.5 text-[11px] text-zinc-500 hover:text-zinc-700 font-medium cursor-pointer"
+              >
+                <Settings2 className="w-3.5 h-3.5" />
+                <span>Google Client ID sozlamalari</span>
+              </button>
+
+              {showConfig && (
+                <div className="mt-2 p-3 bg-zinc-50 rounded-xl border border-zinc-200 space-y-2">
+                  <label className="block text-[11px] font-semibold text-zinc-700">
+                    Google Cloud OAuth Client ID:
+                  </label>
+                  <input
+                    type="text"
+                    defaultValue={googleClientId}
+                    onBlur={(e) => handleSaveClientId(e.target.value.trim())}
+                    placeholder="xxxx.apps.googleusercontent.com"
+                    className="w-full px-2.5 py-1.5 text-[11px] font-mono border border-zinc-200 rounded-lg bg-white"
+                  />
+                  <p className="text-[10px] text-zinc-500">
+                    O'zingizning shaxsiy Google Cloud Client ID-ingizni kiritishingiz mumkin.
+                  </p>
+                </div>
+              )}
+            </div>
           </div>
         )}
       </div>
