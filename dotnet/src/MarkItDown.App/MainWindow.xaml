@@ -5,7 +5,7 @@
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         mc:Ignorable="d"
         Title="MarkItDown Studio .NET"
-        Height="860" Width="1360"
+        Height="860" Width="1380"
         MinHeight="660" MinWidth="1000"
         WindowStyle="None"
         AllowsTransparency="True"
@@ -42,15 +42,26 @@
                         </Border>
                         <TextBlock x:Name="TxtAppTitle" Text="MarkItDown Studio" Foreground="#F8FAFC" FontWeight="Bold" FontSize="14" VerticalAlignment="Center" />
                         <Border Background="#064E3B" BorderBrush="#059669" BorderThickness="1" CornerRadius="6" Padding="6,2" Margin="10,0,0,0">
-                            <TextBlock Text="Obsidian &amp; Multi-AI" Foreground="#34D399" FontSize="10" FontWeight="SemiBold" />
+                            <TextBlock x:Name="TxtSubtitleBadge" Text="Obsidian &amp; Multi-AI" Foreground="#34D399" FontSize="10" FontWeight="SemiBold" />
                         </Border>
                     </StackPanel>
 
-                    <!-- Theme Switcher & Window Control Buttons -->
+                    <!-- Language, Theme Switcher & Window Control Buttons -->
                     <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
+                        <!-- Language Picker -->
+                        <StackPanel Orientation="Horizontal" Margin="0,0,12,0" VerticalAlignment="Center">
+                            <TextBlock x:Name="LblLanguage" Text="🌐 Til:" Foreground="#94A3B8" FontSize="11" VerticalAlignment="Center" Margin="0,0,6,0" />
+                            <ComboBox x:Name="CmbLanguage" Width="115" Height="26" SelectionChanged="CmbLanguage_SelectionChanged"
+                                      Background="#0F172A" Foreground="#F8FAFC" BorderBrush="#334155" FontSize="11" Padding="4,2">
+                                <ComboBoxItem Content="🇺🇿 O'zbekcha" Tag="uz" />
+                                <ComboBoxItem Content="🇬🇧 English" Tag="en" />
+                                <ComboBoxItem Content="🇷🇺 Русский" Tag="ru" />
+                            </ComboBox>
+                        </StackPanel>
+
                         <!-- Theme Picker -->
                         <StackPanel Orientation="Horizontal" Margin="0,0,16,0" VerticalAlignment="Center">
-                            <TextBlock Text="🎨 Mavzu:" Foreground="#94A3B8" FontSize="11" VerticalAlignment="Center" Margin="0,0,6,0" />
+                            <TextBlock x:Name="LblTheme" Text="🎨 Mavzu:" Foreground="#94A3B8" FontSize="11" VerticalAlignment="Center" Margin="0,0,6,0" />
                             <ComboBox x:Name="CmbTheme" Width="135" Height="26" SelectionChanged="CmbTheme_SelectionChanged"
                                       Background="#0F172A" Foreground="#F8FAFC" BorderBrush="#334155" FontSize="11" Padding="4,2">
                                 <ComboBoxItem Content="Midnight Glass" Tag="MidnightGlass" />
@@ -87,7 +98,7 @@
                         <WrapPanel Grid.Column="0" VerticalAlignment="Center">
                             <!-- Provider Selector -->
                             <StackPanel Orientation="Horizontal" Margin="0,0,14,0" VerticalAlignment="Center">
-                                <TextBlock Text="AI Provayder:" Foreground="#94A3B8" FontSize="12" VerticalAlignment="Center" Margin="0,0,6,0" />
+                                <TextBlock x:Name="LblAiProvider" Text="AI Provayder:" Foreground="#94A3B8" FontSize="12" VerticalAlignment="Center" Margin="0,0,6,0" />
                                 <ComboBox x:Name="CmbAiProvider" Width="145" Height="30" SelectionChanged="CmbAiProvider_SelectionChanged"
                                           Background="#0F172A" Foreground="#F8FAFC" BorderBrush="#334155" Padding="6,4">
                                     <ComboBoxItem Content="Google Gemini" Tag="GoogleGemini" />
@@ -102,7 +113,7 @@
 
                             <!-- Model Name -->
                             <StackPanel Orientation="Horizontal" Margin="0,0,14,0" VerticalAlignment="Center">
-                                <TextBlock Text="Model:" Foreground="#94A3B8" FontSize="12" VerticalAlignment="Center" Margin="0,0,6,0" />
+                                <TextBlock x:Name="LblModel" Text="Model:" Foreground="#94A3B8" FontSize="12" VerticalAlignment="Center" Margin="0,0,6,0" />
                                 <ComboBox x:Name="CmbModelName" Width="200" Height="30" IsEditable="True"
                                           Background="#0F172A" Foreground="#F8FAFC" BorderBrush="#334155" Padding="6,4"
                                           LostFocus="CmbModelName_LostFocus" />
@@ -110,7 +121,7 @@
 
                             <!-- API Key -->
                             <StackPanel Orientation="Horizontal" Margin="0,0,14,0" VerticalAlignment="Center">
-                                <TextBlock Text="API Kalit:" Foreground="#94A3B8" FontSize="12" VerticalAlignment="Center" Margin="0,0,6,0" />
+                                <TextBlock x:Name="LblApiKey" Text="API Kalit:" Foreground="#94A3B8" FontSize="12" VerticalAlignment="Center" Margin="0,0,6,0" />
                                 <PasswordBox x:Name="TxtApiKey" Width="185" Height="30" PasswordChar="●"
                                              Background="#0F172A" Foreground="#F8FAFC" BorderBrush="#334155" Padding="6,4" VerticalContentAlignment="Center"
                                              PasswordChanged="TxtApiKey_PasswordChanged" />
@@ -165,9 +176,9 @@
                             <Border x:Name="DropIconBadge" Width="44" Height="44" Background="#312E81" CornerRadius="22" HorizontalAlignment="Center" Margin="0,0,0,8">
                                 <TextBlock Text="📁" FontSize="20" HorizontalAlignment="Center" VerticalAlignment="Center" />
                             </Border>
-                            <TextBlock Text="Faylni bu yerga tashlang" Foreground="#F8FAFC" FontWeight="Bold" FontSize="13" HorizontalAlignment="Center" />
-                            <TextBlock Text="PDF, Word, Excel, PPTX, Rasm (OCR), Audio, ZIP, Kod" Foreground="#94A3B8" FontSize="11" TextWrapping="Wrap" TextAlignment="Center" Margin="0,3,0,8" />
-                            <Button Click="BtnSelectFile_Click" Style="{StaticResource AccentButton}" Content="Fayl Tanlash..." HorizontalAlignment="Center" Padding="14,5" FontSize="11" />
+                            <TextBlock x:Name="TxtDropTitle" Text="Faylni bu yerga tashlang" Foreground="#F8FAFC" FontWeight="Bold" FontSize="13" HorizontalAlignment="Center" />
+                            <TextBlock x:Name="TxtDropSubtitle" Text="PDF, Word, Excel, PPTX, Rasm (OCR), Audio, ZIP, Kod" Foreground="#94A3B8" FontSize="11" TextWrapping="Wrap" TextAlignment="Center" Margin="0,3,0,8" />
+                            <Button x:Name="BtnSelectFile" Click="BtnSelectFile_Click" Style="{StaticResource AccentButton}" Content="Fayl Tanlash..." HorizontalAlignment="Center" Padding="14,5" FontSize="11" />
                         </StackPanel>
                     </Border>
 
@@ -180,7 +191,7 @@
                             </Grid.ColumnDefinitions>
                             <TextBox x:Name="TxtWebUrl" Grid.Column="0" Style="{StaticResource GlassTextBox}" Margin="0,0,8,0"
                                      Text="https://uz.wikipedia.org/wiki/Markdown" Foreground="#F8FAFC" FontSize="12" />
-                            <Button Grid.Column="1" Click="BtnConvertUrl_Click" Style="{StaticResource GlassButton}" Content="URL O'girish" Padding="10,4" FontSize="11" />
+                            <Button x:Name="BtnConvertUrl" Grid.Column="1" Click="BtnConvertUrl_Click" Style="{StaticResource GlassButton}" Content="URL O'girish" Padding="10,4" FontSize="11" />
                         </Grid>
                     </Border>
 
@@ -192,8 +203,8 @@
                                 <RowDefinition Height="*" />
                             </Grid.RowDefinitions>
                             <Grid Grid.Row="0" Margin="0,0,0,8">
-                                <TextBlock Text="O'girilgan Hujjatlar" Foreground="#F8FAFC" FontWeight="SemiBold" FontSize="12" VerticalAlignment="Center" />
-                                <Button Click="BtnClearHistory_Click" HorizontalAlignment="Right" Style="{StaticResource GlassButton}" Content="🗑️ Barchasini Tozalash" Padding="8,3" FontSize="10" />
+                                <TextBlock x:Name="TxtHistoryTitle" Text="O'girilgan Hujjatlar" Foreground="#F8FAFC" FontWeight="SemiBold" FontSize="12" VerticalAlignment="Center" />
+                                <Button x:Name="BtnClearAll" Click="BtnClearHistory_Click" HorizontalAlignment="Right" Style="{StaticResource GlassButton}" Content="🗑️ Barchasini Tozalash" Padding="8,3" FontSize="10" />
                             </Grid>
                             <ListBox x:Name="LstConvertedItems" Grid.Row="1" Background="Transparent" BorderThickness="0"
                                      SelectionChanged="LstConvertedItems_SelectionChanged" ScrollViewer.HorizontalScrollBarVisibility="Disabled">
@@ -253,9 +264,9 @@
 
                             <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
                                 <!-- AI Proofreader & Fixer Button -->
-                                <Button Click="BtnAiProofread_Click" Style="{StaticResource GlassButton}" Content="✨ AI Bilan Tekshirish" Margin="0,0,8,0" Padding="10,6" FontSize="12" ToolTip="Grammatika, jadvallar va format xatoliklarini AI orqali tekshirish" />
-                                <Button Click="BtnCopyMarkdown_Click" Style="{StaticResource GlassButton}" Content="📋 Nusxalash" Margin="0,0,8,0" Padding="12,6" FontSize="12" />
-                                <Button Click="BtnSaveMarkdown_Click" Style="{StaticResource AccentButton}" Content="💾 .md Saqlash" Padding="14,6" FontSize="12" />
+                                <Button x:Name="BtnAiProofread" Click="BtnAiProofread_Click" Style="{StaticResource GlassButton}" Content="✨ AI Bilan Tekshirish" Margin="0,0,8,0" Padding="10,6" FontSize="12" ToolTip="Grammatika, jadvallar va format xatoliklarini AI orqali tekshirish" />
+                                <Button x:Name="BtnCopyMarkdown" Click="BtnCopyMarkdown_Click" Style="{StaticResource GlassButton}" Content="📋 Nusxalash" Margin="0,0,8,0" Padding="12,6" FontSize="12" />
+                                <Button x:Name="BtnSaveMarkdown" Click="BtnSaveMarkdown_Click" Style="{StaticResource AccentButton}" Content="💾 .md Saqlash" Padding="14,6" FontSize="12" />
                             </StackPanel>
                         </Grid>
 
@@ -280,7 +291,7 @@
                         <ColumnDefinition Width="Auto" />
                     </Grid.ColumnDefinitions>
                     <TextBlock x:Name="TxtStatus" Grid.Column="0" Text="Tayyor. PDF, Word, Excel, PPTX, Rasm yoki Audio yuklang." Foreground="#94A3B8" FontSize="11" />
-                    <TextBlock Grid.Column="1" Text="Multi-AI Auto-Fallback Architecture • 100% C# .NET 10" Foreground="#64748B" FontSize="11" />
+                    <TextBlock x:Name="TxtFooterTagline" Grid.Column="1" Text="Multi-AI Auto-Fallback Architecture • 100% C# .NET 10" Foreground="#64748B" FontSize="11" />
                 </Grid>
             </Border>
 
@@ -298,7 +309,7 @@
                         <Grid Grid.Row="0" Margin="0,0,0,14">
                             <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
                                 <TextBlock Text="✨" FontSize="18" Margin="0,0,8,0" />
-                                <TextBlock Text="AI Tahlili va Xatoliklarni Tuzatish Natijasi" Foreground="#F8FAFC" FontWeight="Bold" FontSize="15" />
+                                <TextBlock x:Name="TxtModalHeader" Text="AI Tahlili va Xatoliklarni Tuzatish Natijasi" Foreground="#F8FAFC" FontWeight="Bold" FontSize="15" />
                             </StackPanel>
                             <Button Click="BtnCloseReviewModal_Click" HorizontalAlignment="Right" Style="{StaticResource GlassButton}" Content="✕" Padding="6,2" FontSize="12" />
                         </Grid>
@@ -314,8 +325,8 @@
 
                         <!-- Modal Action Buttons -->
                         <StackPanel Grid.Row="2" Orientation="Horizontal" HorizontalAlignment="Right">
-                            <Button Click="BtnCloseReviewModal_Click" Style="{StaticResource GlassButton}" Content="Bekor Qilish" Margin="0,0,10,0" Padding="14,6" />
-                            <Button Click="BtnApplyAiProofread_Click" Style="{StaticResource AccentButton}" Content="✅ Tasdiqlash va Hujjatga Qo'llash" Padding="16,6" FontWeight="Bold" />
+                            <Button x:Name="BtnModalCancel" Click="BtnCloseReviewModal_Click" Style="{StaticResource GlassButton}" Content="Bekor Qilish" Margin="0,0,10,0" Padding="14,6" />
+                            <Button x:Name="BtnModalApply" Click="BtnApplyAiProofread_Click" Style="{StaticResource AccentButton}" Content="✅ Tasdiqlash va Hujjatga Qo'llash" Padding="16,6" FontWeight="Bold" />
                         </StackPanel>
                     </Grid>
                 </Border>

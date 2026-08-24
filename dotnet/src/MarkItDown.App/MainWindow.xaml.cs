@@ -19,6 +19,7 @@ public partial class MainWindow : Window
     public ObservableCollection<ConversionResult> ConvertedItems { get; } = new();
     private ConversionResult? _activeResult;
     private bool _isInitializing = true;
+    private string _currentLang = "uz";
 
     public MainWindow()
     {
@@ -35,7 +36,28 @@ public partial class MainWindow : Window
 
     private void LoadSavedSettings()
     {
-        // 1. Theme
+        // 1. Language
+        if (CmbLanguage != null)
+        {
+            var found = false;
+            foreach (ComboBoxItem item in CmbLanguage.Items)
+            {
+                if (item.Tag?.ToString() == "uz")
+                {
+                    CmbLanguage.SelectedItem = item;
+                    ApplyLanguage("uz");
+                    found = true;
+                    break;
+                }
+            }
+            if (!found && CmbLanguage.Items.Count > 0)
+            {
+                CmbLanguage.SelectedIndex = 0;
+                ApplyLanguage("uz");
+            }
+        }
+
+        // 2. Theme
         if (CmbTheme != null)
         {
             var found = false;
@@ -56,7 +78,7 @@ public partial class MainWindow : Window
             }
         }
 
-        // 2. Provider
+        // 3. Provider
         if (CmbAiProvider != null)
         {
             var found = false;
@@ -77,13 +99,13 @@ public partial class MainWindow : Window
 
         PopulateModelNames(_config.SelectedProvider);
 
-        // 3. Model
+        // 4. Model
         if (CmbModelName != null && !string.IsNullOrEmpty(_config.SelectedModel))
         {
             CmbModelName.Text = _config.SelectedModel;
         }
 
-        // 4. API Key
+        // 5. API Key
         var savedKey = _config.GetApiKey(_config.SelectedProvider);
         if (TxtApiKey != null)
         {
@@ -91,7 +113,7 @@ public partial class MainWindow : Window
         }
         UpdateKeyStatusAndGuide(_config.SelectedProvider, savedKey);
 
-        // 5. Custom URL & AI switch
+        // 6. Custom URL & AI switch
         if (TxtCustomBaseUrl != null)
         {
             TxtCustomBaseUrl.Text = _config.CustomBaseUrl ?? "http://localhost:11434";
@@ -102,9 +124,134 @@ public partial class MainWindow : Window
         }
     }
 
+    private void CmbLanguage_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (_isInitializing || CmbLanguage == null) return;
+        if (CmbLanguage.SelectedItem is ComboBoxItem item)
+        {
+            var lang = item.Tag?.ToString() ?? "uz";
+            ApplyLanguage(lang);
+        }
+    }
+
+    private void ApplyLanguage(string lang)
+    {
+        _currentLang = lang;
+        switch (lang)
+        {
+            case "en":
+                if (LblLanguage != null) LblLanguage.Text = "🌐 Lang:";
+                if (LblTheme != null) LblTheme.Text = "🎨 Theme:";
+                if (LblAiProvider != null) LblAiProvider.Text = "AI Provider:";
+                if (LblModel != null) LblModel.Text = "Model:";
+                if (LblApiKey != null) LblApiKey.Text = "API Key:";
+                if (TxtDropTitle != null) TxtDropTitle.Text = "Drop your file here";
+                if (TxtDropSubtitle != null) TxtDropSubtitle.Text = "PDF, Word, Excel, PPTX, Images (OCR), Audio, ZIP, Code";
+                if (BtnSelectFile != null) BtnSelectFile.Content = "Select File...";
+                if (BtnConvertUrl != null) BtnConvertUrl.Content = "Convert URL";
+                if (TxtHistoryTitle != null) TxtHistoryTitle.Text = "Converted Documents";
+                if (BtnClearAll != null) BtnClearAll.Content = "🗑️ Clear All";
+                if (BtnAiProofread != null) BtnAiProofread.Content = "✨ AI Proofread";
+                if (BtnCopyMarkdown != null) BtnCopyMarkdown.Content = "📋 Copy";
+                if (BtnSaveMarkdown != null) BtnSaveMarkdown.Content = "💾 Save .md";
+                if (TxtStatus != null) TxtStatus.Text = "Ready. Upload PDF, Word, Excel, PPTX, Image or Audio.";
+                if (TxtFooterTagline != null) TxtFooterTagline.Text = "Multi-AI Auto-Fallback Architecture • 100% C# .NET 10";
+                if (TxtModalHeader != null) TxtModalHeader.Text = "AI Analysis & Error Correction Result";
+                if (BtnModalCancel != null) BtnModalCancel.Content = "Cancel";
+                if (BtnModalApply != null) BtnModalApply.Content = "✅ Apply to Document";
+                break;
+
+            case "ru":
+                if (LblLanguage != null) LblLanguage.Text = "🌐 Язык:";
+                if (LblTheme != null) LblTheme.Text = "🎨 Тема:";
+                if (LblAiProvider != null) LblAiProvider.Text = "ИИ Провайдер:";
+                if (LblModel != null) LblModel.Text = "Модель:";
+                if (LblApiKey != null) LblApiKey.Text = "API Ключ:";
+                if (TxtDropTitle != null) TxtDropTitle.Text = "Перетащите файл сюда";
+                if (TxtDropSubtitle != null) TxtDropSubtitle.Text = "PDF, Word, Excel, PPTX, Изображения (OCR), Аудио, ZIP, Код";
+                if (BtnSelectFile != null) BtnSelectFile.Content = "Выбрать файл...";
+                if (BtnConvertUrl != null) BtnConvertUrl.Content = "Конвертировать URL";
+                if (TxtHistoryTitle != null) TxtHistoryTitle.Text = "Конвертированные файлы";
+                if (BtnClearAll != null) BtnClearAll.Content = "🗑️ Очистить всё";
+                if (BtnAiProofread != null) BtnAiProofread.Content = "✨ Проверить с ИИ";
+                if (BtnCopyMarkdown != null) BtnCopyMarkdown.Content = "📋 Копировать";
+                if (BtnSaveMarkdown != null) BtnSaveMarkdown.Content = "💾 Сохранить .md";
+                if (TxtStatus != null) TxtStatus.Text = "Готово. Загрузите PDF, Word, Excel, PPTX, изображение или аудио.";
+                if (TxtFooterTagline != null) TxtFooterTagline.Text = "Мульти-ИИ архитектура с авто-переключением • 100% C# .NET 10";
+                if (TxtModalHeader != null) TxtModalHeader.Text = "Результат анализа и исправления ИИ";
+                if (BtnModalCancel != null) BtnModalCancel.Content = "Отмена";
+                if (BtnModalApply != null) BtnModalApply.Content = "✅ Применить к документу";
+                break;
+
+            default: // uz
+                if (LblLanguage != null) LblLanguage.Text = "🌐 Til:";
+                if (LblTheme != null) LblTheme.Text = "🎨 Mavzu:";
+                if (LblAiProvider != null) LblAiProvider.Text = "AI Provayder:";
+                if (LblModel != null) LblModel.Text = "Model:";
+                if (LblApiKey != null) LblApiKey.Text = "API Kalit:";
+                if (TxtDropTitle != null) TxtDropTitle.Text = "Faylni bu yerga tashlang";
+                if (TxtDropSubtitle != null) TxtDropSubtitle.Text = "PDF, Word, Excel, PPTX, Rasm (OCR), Audio, ZIP, Kod";
+                if (BtnSelectFile != null) BtnSelectFile.Content = "Fayl Tanlash...";
+                if (BtnConvertUrl != null) BtnConvertUrl.Content = "URL O'girish";
+                if (TxtHistoryTitle != null) TxtHistoryTitle.Text = "O'girilgan Hujjatlar";
+                if (BtnClearAll != null) BtnClearAll.Content = "🗑️ Barchasini Tozalash";
+                if (BtnAiProofread != null) BtnAiProofread.Content = "✨ AI Bilan Tekshirish";
+                if (BtnCopyMarkdown != null) BtnCopyMarkdown.Content = "📋 Nusxalash";
+                if (BtnSaveMarkdown != null) BtnSaveMarkdown.Content = "💾 .md Saqlash";
+                if (TxtStatus != null) TxtStatus.Text = "Tayyor. PDF, Word, Excel, PPTX, Rasm yoki Audio yuklang.";
+                if (TxtFooterTagline != null) TxtFooterTagline.Text = "Multi-AI Auto-Fallback Architecture • 100% C# .NET 10";
+                if (TxtModalHeader != null) TxtModalHeader.Text = "AI Tahlili va Xatoliklarni Tuzatish Natijasi";
+                if (BtnModalCancel != null) BtnModalCancel.Content = "Bekor Qilish";
+                if (BtnModalApply != null) BtnModalApply.Content = "✅ Tasdiqlash va Hujjatga Qo'llash";
+                break;
+        }
+
+        UpdateKeyStatusAndGuide(GetSelectedProvider(), TxtApiKey?.Password?.Trim() ?? string.Empty);
+    }
+
     private void LoadDefaultSample()
     {
-        var welcomeMd = @"# 📄 MarkItDown Studio .NET ga Xush Kelibsiz! 🚀
+        var welcomeMd = _currentLang switch
+        {
+            "en" => @"# 📄 Welcome to MarkItDown Studio .NET! 🚀
+
+> 📌 **Document:** `Sample_Guide.md` | **System:** Multi-AI Smart Fallback Engine
+
+## 1. Capabilities
+- **PDF, Word (.docx), Excel (.xlsx), PowerPoint (.pptx), CSV, JSON, HTML, Code and ZIP** converted into 100% clean Markdown.
+- No unwanted clutter, original document flow preserved.
+
+## 2. Universal AI Providers & Models
+- **Google Gemini:** `gemini-2.5-flash`, `gemini-2.5-pro`, `gemini-3.7-flash`, `gemini-3-flash`, `gemini-3-pro`
+- **Groq AI (Ultra-Fast 500+ tok/s):** `llama-3.3-70b-versatile`, `llama-3.1-8b-instant`, `deepseek-r1-distill-llama-70b`
+- **OpenAI:** `gpt-4o`, `gpt-4o-mini`, `o3-mini`, `o1`
+- **Anthropic Claude:** `claude-3-7-sonnet`, `claude-3-5-sonnet`, `claude-3-5-haiku`
+- **DeepSeek:** `deepseek-chat` (V3), `deepseek-reasoner` (R1)
+- **Ollama:** `llama3.2-vision`, `llava`, `qwen2.5-vl`
+
+## 3. Smart Fallback
+- If the selected model hits a rate limit or error, it seamlessly fails over to backup models without interrupting your workflow!
+",
+            "ru" => @"# 📄 Добро пожаловать в MarkItDown Studio .NET! 🚀
+
+> 📌 **Документ:** `Руководство.md` | **Система:** Мульти-ИИ движок с авто-переключением
+
+## 1. Возможности
+- **PDF, Word (.docx), Excel (.xlsx), PowerPoint (.pptx), CSV, JSON, HTML, Код и ZIP** в 100% чистый Markdown.
+- Без лишнего мусора, с сохранением структуры оригинального документа.
+
+## 2. Универсальные ИИ Провайдеры и Модели
+- **Google Gemini:** `gemini-2.5-flash`, `gemini-2.5-pro`, `gemini-3.7-flash`, `gemini-3-flash`, `gemini-3-pro`
+- **Groq AI (Сверхбыстрый 500+ ток/сек):** `llama-3.3-70b-versatile`, `llama-3.1-8b-instant`, `deepseek-r1-distill-llama-70b`
+- **OpenAI:** `gpt-4o`, `gpt-4o-mini`, `o3-mini`, `o1`
+- **Anthropic Claude:** `claude-3-7-sonnet`, `claude-3-5-sonnet`, `claude-3-5-haiku`
+- **DeepSeek:** `deepseek-chat` (V3), `deepseek-reasoner` (R1)
+- **Ollama:** `llama3.2-vision`, `llava`, `qwen2.5-vl`
+
+## 3. Умное авто-переключение (Fallback)
+- Если у выбранной модели исчерпан лимит запросов, система автоматически переключится на резервную модель без остановки работы!
+",
+            _ => @"# 📄 MarkItDown Studio .NET ga Xush Kelibsiz! 🚀
 
 > 📌 **Hujjat:** `Namuna_Qollanma.md` | **Tizim:** Multi-AI Smart Fallback Dvigatel
 
@@ -122,7 +269,9 @@ public partial class MainWindow : Window
 
 ## 3. Smart Fallback (Avtomatik o'tish)
 - Agar tanlangan modelning limiti tugasa yoki band bo'lsa, tizim avtomatik zaxira modelga o'tib, konvertatsiyani to'xtovsiz davom ettiradi!
-";
+"
+        };
+
         if (TxtMarkdownEditor != null)
         {
             TxtMarkdownEditor.Text = welcomeMd;
@@ -331,7 +480,12 @@ public partial class MainWindow : Window
         {
             if (TxtKeyStatus != null)
             {
-                TxtKeyStatus.Text = "🔒 Kalit saqlandi";
+                TxtKeyStatus.Text = _currentLang switch
+                {
+                    "en" => "🔒 Key saved",
+                    "ru" => "🔒 Ключ сохранен",
+                    _ => "🔒 Kalit saqlandi"
+                };
                 TxtKeyStatus.Foreground = new SolidColorBrush(Color.FromRgb(16, 185, 129));
             }
             if (PnlKeyGuide != null) PnlKeyGuide.Visibility = Visibility.Collapsed;
@@ -340,7 +494,12 @@ public partial class MainWindow : Window
         {
             if (TxtKeyStatus != null)
             {
-                TxtKeyStatus.Text = "⚠️ Kalit kiritilmagan";
+                TxtKeyStatus.Text = _currentLang switch
+                {
+                    "en" => "⚠️ Key missing",
+                    "ru" => "⚠️ Ключ не введен",
+                    _ => "⚠️ Kalit kiritilmagan"
+                };
                 TxtKeyStatus.Foreground = new SolidColorBrush(Color.FromRgb(245, 158, 11));
             }
             if (PnlKeyGuide != null && TxtKeyGuide != null)
@@ -418,11 +577,18 @@ public partial class MainWindow : Window
 
     private async void BtnSelectFile_Click(object sender, RoutedEventArgs e)
     {
+        var filterText = _currentLang switch
+        {
+            "en" => "All Supported Files|*.pdf;*.docx;*.doc;*.pptx;*.ppt;*.xlsx;*.xls;*.ods;*.csv;*.tsv;*.json;*.html;*.htm;*.txt;*.py;*.cs;*.js;*.ts;*.png;*.jpg;*.jpeg;*.webp;*.mp3;*.wav;*.m4a;*.zip|Documents (*.pdf, *.docx, *.pptx, *.xlsx)|*.pdf;*.docx;*.pptx;*.xlsx|All Files (*.*)|*.*",
+            "ru" => "Все поддерживаемые файлы|*.pdf;*.docx;*.doc;*.pptx;*.ppt;*.xlsx;*.xls;*.ods;*.csv;*.tsv;*.json;*.html;*.htm;*.txt;*.py;*.cs;*.js;*.ts;*.png;*.jpg;*.jpeg;*.webp;*.mp3;*.wav;*.m4a;*.zip|Документы (*.pdf, *.docx, *.pptx, *.xlsx)|*.pdf;*.docx;*.pptx;*.xlsx|Все файлы (*.*)|*.*",
+            _ => "Barcha Qo'llab-quvvatlanuvchi Fayllar|*.pdf;*.docx;*.doc;*.pptx;*.ppt;*.xlsx;*.xls;*.ods;*.csv;*.tsv;*.json;*.html;*.htm;*.txt;*.py;*.cs;*.js;*.ts;*.png;*.jpg;*.jpeg;*.webp;*.mp3;*.wav;*.m4a;*.zip|Hujjatlar (*.pdf, *.docx, *.pptx, *.xlsx)|*.pdf;*.docx;*.pptx;*.xlsx|Barcha Fayllar (*.*)|*.*"
+        };
+
         var dlg = new OpenFileDialog
         {
-            Title = "Konvertatsiya uchun fayllarni tanlang",
+            Title = _currentLang switch { "en" => "Select files to convert", "ru" => "Выберите файлы для конвертации", _ => "Konvertatsiya uchun fayllarni tanlang" },
             Multiselect = true,
-            Filter = "Barcha Qo'llab-quvvatlanuvchi Fayllar|*.pdf;*.docx;*.doc;*.pptx;*.ppt;*.xlsx;*.xls;*.ods;*.csv;*.tsv;*.json;*.html;*.htm;*.txt;*.py;*.cs;*.js;*.ts;*.png;*.jpg;*.jpeg;*.webp;*.mp3;*.wav;*.m4a;*.zip|Hujjatlar (*.pdf, *.docx, *.pptx, *.xlsx)|*.pdf;*.docx;*.pptx;*.xlsx|Tasvirlar va Audio (*.png, *.jpg, *.mp3, *.wav)|*.png;*.jpg;*.jpeg;*.webp;*.mp3;*.wav;*.m4a|Barcha Fayllar (*.*)|*.*"
+            Filter = filterText
         };
 
         if (dlg.ShowDialog() == true)
@@ -436,14 +602,14 @@ public partial class MainWindow : Window
         var options = GetCurrentOptions();
         var aiConfig = GetCurrentAiConfig();
 
-        if (TxtStatus != null) TxtStatus.Text = $"{filePaths.Length} ta fayl Markdown formatiga o'tkazilmoqda...";
+        if (TxtStatus != null) TxtStatus.Text = $"{filePaths.Length} files converting...";
 
         foreach (var path in filePaths)
         {
             try
             {
                 var fileName = Path.GetFileName(path);
-                if (TxtStatus != null) TxtStatus.Text = $"Tahlil qilinmoqda: {fileName}...";
+                if (TxtStatus != null) TxtStatus.Text = $"Processing: {fileName}...";
 
                 var results = await _engine.ConvertFileAsync(path, options, aiConfig);
 
@@ -455,11 +621,11 @@ public partial class MainWindow : Window
             }
             catch (Exception ex)
             {
-                MessageBox.Show($"Faylni o'girishda xatolik ({Path.GetFileName(path)}):\n{ex.Message}", "Xatolik", MessageBoxButton.OK, MessageBoxImage.Warning);
+                MessageBox.Show($"Xatolik ({Path.GetFileName(path)}):\n{ex.Message}", "Xatolik", MessageBoxButton.OK, MessageBoxImage.Warning);
             }
         }
 
-        if (TxtStatus != null) TxtStatus.Text = "Barcha fayllar muvaffaqiyatli o'girildi!";
+        if (TxtStatus != null) TxtStatus.Text = _currentLang switch { "en" => "All files converted successfully!", "ru" => "Все файлы успешно конвертированы!", _ => "Barcha fayllar muvaffaqiyatli o'girildi!" };
     }
 
     private async void BtnConvertUrl_Click(object sender, RoutedEventArgs e)
@@ -468,11 +634,11 @@ public partial class MainWindow : Window
         var url = TxtWebUrl.Text.Trim();
         if (string.IsNullOrWhiteSpace(url) || !url.StartsWith("http", StringComparison.OrdinalIgnoreCase))
         {
-            MessageBox.Show("Iltimos, to'g'ri HTTP/HTTPS web manzilni kiriting.", "Xabar", MessageBoxButton.OK, MessageBoxImage.Information);
+            MessageBox.Show("HTTP/HTTPS URL kiriting.", "Xabar", MessageBoxButton.OK, MessageBoxImage.Information);
             return;
         }
 
-        if (TxtStatus != null) TxtStatus.Text = $"Web sahifa yuklanmoqda: {url}...";
+        if (TxtStatus != null) TxtStatus.Text = $"Loading URL: {url}...";
         try
         {
             var options = GetCurrentOptions();
@@ -481,12 +647,12 @@ public partial class MainWindow : Window
             var result = await _engine.ConvertUrlAsync(url, options, aiConfig);
             ConvertedItems.Insert(0, result);
             SetActiveResult(result);
-            if (TxtStatus != null) TxtStatus.Text = "Web sahifa muvaffaqiyatli Markdown formatiga o'girildi!";
+            if (TxtStatus != null) TxtStatus.Text = "URL converted!";
         }
         catch (Exception ex)
         {
-            MessageBox.Show($"URL ni o'girishda xatolik:\n{ex.Message}", "Xatolik", MessageBoxButton.OK, MessageBoxImage.Error);
-            if (TxtStatus != null) TxtStatus.Text = "Xatolik yuz berdi.";
+            MessageBox.Show($"URL error:\n{ex.Message}", "Xatolik", MessageBoxButton.OK, MessageBoxImage.Error);
+            if (TxtStatus != null) TxtStatus.Text = "Error.";
         }
     }
 
@@ -494,7 +660,7 @@ public partial class MainWindow : Window
     {
         _activeResult = result;
         if (TxtDocTitle != null) TxtDocTitle.Text = result.FileName;
-        if (TxtDocStats != null) TxtDocStats.Text = $"Format: {result.OriginalFormat} • {result.WordCount:N0} ta so'z • {result.CharCount:N0} ta belgi • {result.DurationMs} ms • Dvigatel: {result.EngineName}";
+        if (TxtDocStats != null) TxtDocStats.Text = $"Format: {result.OriginalFormat} • {result.WordCount:N0} {_currentLang switch { "en" => "words", "ru" => "слов", _ => "ta so'z" }} • {result.CharCount:N0} {_currentLang switch { "en" => "chars", "ru" => "симв.", _ => "ta belgi" }} • {result.DurationMs} ms • Dvigatel: {result.EngineName}";
         if (TxtMarkdownEditor != null) TxtMarkdownEditor.Text = result.Markdown;
     }
 
@@ -523,7 +689,7 @@ public partial class MainWindow : Window
                     LoadDefaultSample();
                 }
             }
-            if (TxtStatus != null) TxtStatus.Text = $"\"{item.FileName}\" ro'yxatdan o'chirildi.";
+            if (TxtStatus != null) TxtStatus.Text = $"\"{item.FileName}\" removed.";
         }
     }
 
@@ -531,12 +697,21 @@ public partial class MainWindow : Window
     private void BtnClearHistory_Click(object sender, RoutedEventArgs e)
     {
         if (ConvertedItems.Count == 0) return;
-        var res = MessageBox.Show("Haqiqatan ham barcha o'girilgan fayllar tarixini tozalamoqchimisiz?", "Tarixni tozalash", MessageBoxButton.YesNo, MessageBoxImage.Question);
+        var msg = _currentLang switch
+        {
+            "en" => "Are you sure you want to clear all converted documents history?",
+            "ru" => "Вы уверены, что хотите очистить всю историю файлов?",
+            _ => "Haqiqatan ham barcha o'girilgan fayllar tarixini tozalamoqchimisiz?"
+        };
+
+        var title = _currentLang switch { "en" => "Clear History", "ru" => "Очистка истории", _ => "Tarixni tozalash" };
+
+        var res = MessageBox.Show(msg, title, MessageBoxButton.YesNo, MessageBoxImage.Question);
         if (res == MessageBoxResult.Yes)
         {
             ConvertedItems.Clear();
             LoadDefaultSample();
-            if (TxtStatus != null) TxtStatus.Text = "Barcha tarix tozalandi.";
+            if (TxtStatus != null) TxtStatus.Text = "Cleared.";
         }
     }
 
@@ -546,18 +721,18 @@ public partial class MainWindow : Window
         var currentText = TxtMarkdownEditor?.Text?.Trim();
         if (string.IsNullOrEmpty(currentText))
         {
-            MessageBox.Show("Tekshirish uchun Markdown matni mavjud emas.", "Xabar", MessageBoxButton.OK, MessageBoxImage.Information);
+            MessageBox.Show("Markdown matni mavjud emas.", "Xabar", MessageBoxButton.OK, MessageBoxImage.Information);
             return;
         }
 
         var aiConfig = GetCurrentAiConfig();
         if (aiConfig.Provider != AiProvider.Ollama && string.IsNullOrWhiteSpace(aiConfig.ApiKey))
         {
-            MessageBox.Show("AI orqali tekshirish uchun yuqoridagi 'API Kalit' maydoniga kalitingizni kiriting.", "API Kalit Talab Qilinadi", MessageBoxButton.OK, MessageBoxImage.Warning);
+            MessageBox.Show("API Key talab qilinadi.", "API Key", MessageBoxButton.OK, MessageBoxImage.Warning);
             return;
         }
 
-        if (TxtStatus != null) TxtStatus.Text = "AI Markdown matnidagi xatoliklar va jadvallarni tekshirmoqda...";
+        if (TxtStatus != null) TxtStatus.Text = "AI Proofreading...";
         try
         {
             var prompt = @"Ushbu Markdown hujjatidagi barcha orfografik, grammatik xatoliklarni, buzilgan jadvallarni va Lotin/Krill chalkashliklarini (o'/ў, g'/ғ, sh/ш, ch/ч) to'liq to'g'rilab, toza va chiroyli Markdown qilib qaytar. Ortiqcha izohlarsiz, faqat to'g'rilangan yakuniy Markdownni ber.";
@@ -567,12 +742,12 @@ public partial class MainWindow : Window
 
             if (TxtAiProofreadResult != null) TxtAiProofreadResult.Text = correctedMd;
             if (PnlAiReviewModal != null) PnlAiReviewModal.Visibility = Visibility.Visible;
-            if (TxtStatus != null) TxtStatus.Text = "AI tahlili yakunlandi! Natijani ko'rib chiqishingiz mumkin.";
+            if (TxtStatus != null) TxtStatus.Text = "Proofreading complete!";
         }
         catch (Exception ex)
         {
-            MessageBox.Show($"AI tekshirishida xatolik:\n{ex.Message}", "Xatolik", MessageBoxButton.OK, MessageBoxImage.Error);
-            if (TxtStatus != null) TxtStatus.Text = "Xatolik yuz berdi.";
+            MessageBox.Show($"AI error:\n{ex.Message}", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
+            if (TxtStatus != null) TxtStatus.Text = "Error.";
         }
     }
 
@@ -593,11 +768,11 @@ public partial class MainWindow : Window
                 _activeResult.WordCount = MarkItDownEngine.CountWords(corrected);
                 _activeResult.CharCount = corrected.Length;
                 _activeResult.EstimatedTokens = MarkItDownEngine.EstimateTokens(corrected);
-                if (TxtDocStats != null) TxtDocStats.Text = $"Format: {_activeResult.OriginalFormat} • {_activeResult.WordCount:N0} ta so'z • {_activeResult.CharCount:N0} ta belgi (AI bilan tekshirildi)";
+                if (TxtDocStats != null) TxtDocStats.Text = $"Format: {_activeResult.OriginalFormat} • {_activeResult.WordCount:N0} ta so'z • {_activeResult.CharCount:N0} ta belgi (AI Verified)";
             }
             if (PnlAiReviewModal != null) PnlAiReviewModal.Visibility = Visibility.Collapsed;
-            if (TxtStatus != null) TxtStatus.Text = "AI tuzatishlari hujjatga muvaffaqiyatli qo'llandi!";
-            MessageBox.Show("Markdown hujjati AI tuzatishlari bilan muvaffaqiyatli yangilandi!", "Muvaffaqiyatli", MessageBoxButton.OK, MessageBoxImage.Information);
+            if (TxtStatus != null) TxtStatus.Text = "Applied!";
+            MessageBox.Show("Markdown hujjati AI tuzatishlari bilan yangilandi!", "Muvaffaqiyatli", MessageBoxButton.OK, MessageBoxImage.Information);
         }
     }
 
@@ -606,7 +781,7 @@ public partial class MainWindow : Window
         if (TxtMarkdownEditor != null && !string.IsNullOrEmpty(TxtMarkdownEditor.Text))
         {
             Clipboard.SetText(TxtMarkdownEditor.Text);
-            if (TxtStatus != null) TxtStatus.Text = "Markdown matni buferga nusxalandi! (Clipboard)";
+            if (TxtStatus != null) TxtStatus.Text = "Copied to Clipboard!";
         }
     }
 
@@ -614,7 +789,7 @@ public partial class MainWindow : Window
     {
         if (TxtMarkdownEditor == null || string.IsNullOrWhiteSpace(TxtMarkdownEditor.Text))
         {
-            MessageBox.Show("Saqlash uchun Markdown matni mavjud emas.", "Xabar", MessageBoxButton.OK, MessageBoxImage.Information);
+            MessageBox.Show("Markdown matni mavjud emas.", "Xabar", MessageBoxButton.OK, MessageBoxImage.Information);
             return;
         }
 
@@ -626,14 +801,14 @@ public partial class MainWindow : Window
         {
             FileName = defaultName,
             DefaultExt = ".md",
-            Filter = "Markdown Hujjati (*.md)|*.md|Matn Hujjati (*.txt)|*.txt|Barcha Fayllar (*.*)|*.*"
+            Filter = "Markdown Document (*.md)|*.md|Text Document (*.txt)|*.txt|All Files (*.*)|*.*"
         };
 
         if (dlg.ShowDialog() == true)
         {
             File.WriteAllText(dlg.FileName, TxtMarkdownEditor.Text, System.Text.Encoding.UTF8);
-            if (TxtStatus != null) TxtStatus.Text = $"Fayl saqlandi: {dlg.FileName}";
-            MessageBox.Show($"Markdown fayli muvaffaqiyatli saqlandi!\n{dlg.FileName}", "Muvaffaqiyatli", MessageBoxButton.OK, MessageBoxImage.Information);
+            if (TxtStatus != null) TxtStatus.Text = $"Saved: {dlg.FileName}";
+            MessageBox.Show($"Markdown file saved!\n{dlg.FileName}", "Success", MessageBoxButton.OK, MessageBoxImage.Information);
         }
     }
 }

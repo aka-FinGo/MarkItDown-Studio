@@ -19,6 +19,7 @@ import { SupportedFormatsModal } from "./components/SupportedFormatsModal";
 import { ApiKeyModal } from "./components/ApiKeyModal";
 import { AiProofreadModal } from "./components/AiProofreadModal";
 import { ConvertedItem, ConversionOptions, ThemeType } from "./types";
+import { Language, TRANSLATIONS } from "./locales/i18n";
 import {
   convertFileClient,
   convertUrlClient,
@@ -35,6 +36,7 @@ export default function App() {
     customPrompt: "",
   });
 
+  const [language, setLanguage] = useState<Language>("uz");
   const [theme, setTheme] = useState<ThemeType>("MidnightGlass");
   const [aiProvider, setAiProvider] = useState<string>("GoogleGemini");
   const [aiModel, setAiModel] = useState<string>("gemini-2.5-flash");
@@ -56,8 +58,13 @@ export default function App() {
   const [aiProofreadResult, setAiProofreadResult] = useState<string>("");
   const [isProofreading, setIsProofreading] = useState(false);
 
+  const t = TRANSLATIONS[language];
+
   // Load saved state from localStorage
   useEffect(() => {
+    const savedLang = localStorage.getItem("markitdown_lang") as Language;
+    if (savedLang) setLanguage(savedLang);
+
     const savedTheme = localStorage.getItem("markitdown_theme") as ThemeType;
     if (savedTheme) setTheme(savedTheme);
 
@@ -92,6 +99,11 @@ export default function App() {
       localStorage.removeItem("markitdown_items");
     }
   }, [convertedItems]);
+
+  const handleLanguageChange = (newLang: Language) => {
+    setLanguage(newLang);
+    localStorage.setItem("markitdown_lang", newLang);
+  };
 
   const handleThemeChange = (newTheme: ThemeType) => {
     setTheme(newTheme);
@@ -272,6 +284,8 @@ export default function App() {
         hasApiKey={Boolean(apiKey && apiKey.trim().length > 0)}
         theme={theme}
         onThemeChange={handleThemeChange}
+        language={language}
+        onLanguageChange={handleLanguageChange}
       />
 
       <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6 flex flex-col">
@@ -296,7 +310,7 @@ export default function App() {
         {isProofreading && (
           <div className="mb-6 p-3 bg-indigo-950/70 border border-indigo-500/50 rounded-xl flex items-center space-x-3 text-indigo-200 animate-in fade-in">
             <Loader2 className="w-4 h-4 animate-spin text-indigo-400 shrink-0" />
-            <span className="text-xs font-semibold">AI Markdown matnidagi xatoliklar va jadvallarni tekshirmoqda...</span>
+            <span className="text-xs font-semibold">{t.proofreadingProgress}</span>
           </div>
         )}
 
@@ -314,7 +328,7 @@ export default function App() {
                 }`}
               >
                 <UploadCloud className="w-3.5 h-3.5" />
-                <span>Fayl Yuklash</span>
+                <span>{t.dropTitle}</span>
               </button>
               <button
                 onClick={() => setActiveTab("url")}
@@ -335,7 +349,7 @@ export default function App() {
                 <div className="flex items-center justify-between text-xs text-indigo-200 font-semibold">
                   <span className="flex items-center gap-2">
                     <Loader2 className="w-3.5 h-3.5 animate-spin text-indigo-400" />
-                    <span>O'girilmoqda ({conversionProgress.current}/{conversionProgress.total}):</span>
+                    <span>{t.convertingProgress} ({conversionProgress.current}/{conversionProgress.total}):</span>
                   </span>
                   <span className="truncate max-w-[160px]">{conversionProgress.filename}</span>
                 </div>
@@ -361,6 +375,8 @@ export default function App() {
                     onClearFiles={handleClearFiles}
                     onConvert={handleConvertFiles}
                     isConverting={isConverting}
+                    language={language}
+                    theme={theme}
                   />
                 </div>
               )}
