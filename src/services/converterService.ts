@@ -5,10 +5,13 @@ import TurndownService from "turndown";
 import * as pdfjsLib from "pdfjs-dist";
 import { ConvertedItem, ConversionOptions } from "../types";
 
-// Configure pdfjs worker for browser compatibility
+// Configure PDF.js worker, CMaps and Standard Fonts for 100% accurate Cyrillic (қ, ғ, ў, ҳ) & Latin rendering
 if (typeof window !== "undefined") {
   pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.mjs`;
 }
+
+const CMAP_URL = `https://cdn.jsdelivr.net/npm/pdfjs-dist@${pdfjsLib.version}/cmaps/`;
+const STANDARD_FONT_URL = `https://cdn.jsdelivr.net/npm/pdfjs-dist@${pdfjsLib.version}/standard_fonts/`;
 
 // Configure Turndown for clean HTML to Markdown conversion
 const turndownService = new TurndownService({
@@ -55,40 +58,90 @@ export function estimateTokens(text: string): number {
 }
 
 export function countWords(text: string): number {
-  const clean = text.replace(/```[\s\S]*?```/g, "").replace(/[#*_`\[\]()]/g, "");
+  const clean = text.replace(/```[\s\S]*?```/g, "").replace(/[#*_`\[\]()]/g, " ");
   const words = clean.trim().match(/\S+/g);
   return words ? words.length : 0;
 }
 
-// 1. PDF Conversion in Browser (0 AI Tokens)
-export async function pdfToMarkdown(arrayBuffer: ArrayBuffer): Promise<string> {
+// Cyrillic & Uzbek Unicode Normalizer
+function normalizeText(text: string): string {
+  if (!text) return "";
+  return text
+    .normalize("NFC")
+    .replace(/\u00A0/g, " ") // Non-breaking space to regular space
+    .replace(/[\u200B-\u200D\uFEFF]/g, ""); // Zero-width spaces
+}
+
+// 1. PDF Conversion with full CMap and Cyrillic glyph support
+export async function pdfToMarkdown(arrayBuffer: ArrayBuffer): Promise<{ totalPages: number; pages: { pageNum: number; text: string; hasImages: boolean }[] }> {
   try {
-    const loadingTask = pdfjsLib.getDocument({ data: new Uint8Array(arrayBuffer) });
+    const loadingTask = pdfjsLib.getDocument({
+      data: new Uint8Array(arrayBuffer),
+      cMapUrl: CMAP_URL,
+      cMapPacked: true,
+      standardFontDataUrl: STANDARD_FONT_URL,
+      useSystemFonts: true,
+    });
+
     const pdf = await loadingTask.promise;
-    let fullText = "";
+    const pages: { pageNum: number; text: string; hasImages: boolean }[] = [];
 
     for (let pageNum = 1; pageNum <= pdf.numPages; pageNum++) {
+      // Yield to UI thread every page to prevent browser freeze
+      await new Promise((r) => setTimeout(r, 0));
+
       const page = await pdf.getPage(pageNum);
       const textContent = await page.getTextContent();
-      const pageText = textContent.items
-        .map((item: any) => item.str)
-        .join(" ");
 
-      if (pdf.numPages > 1) {
-        fullText += `\n\n### Sahifa ${pageNum}\n\n` + pageText;
-      } else {
-        fullText += "\n\n" + pageText;
+      // Cluster items by Y coordinate to preserve proper line breaks and Cyrillic words
+      const lineMap: Map<number, { x: number; str: string }[]> = new Map();
+
+      for (const item of textContent.items as any[]) {
+        if (!item.str) continue;
+        const y = Math.round(item.transform[5]); // Y coordinate
+        const x = item.transform[4]; // X coordinate
+
+        // Find nearest Y within 3 pixels threshold
+        let targetY = y;
+        for (const existingY of lineMap.keys()) {
+          if (Math.abs(existingY - y) <= 3) {
+            targetY = existingY;
+            break;
+          }
+        }
+
+        if (!lineMap.has(targetY)) {
+          lineMap.set(targetY, []);
+        }
+        lineMap.get(targetY)!.push({ x, str: normalizeText(item.str) });
       }
+
+      // Sort lines top to bottom (descending Y)
+      const sortedYs = Array.from(lineMap.keys()).sort((a, b) => b - a);
+      const lines: string[] = [];
+
+      for (const y of sortedYs) {
+        const lineItems = lineMap.get(y)!.sort((a, b) => a.x - b.x);
+        const lineStr = lineItems.map((i) => i.str).join(" ").trim();
+        if (lineStr) {
+          lines.push(lineStr);
+        }
+      }
+
+      const pageText = lines.join("\n");
+      const hasImages = textContent.items.length < 5; // likely scanned page if very few text items
+
+      pages.push({ pageNum, text: pageText, hasImages });
     }
 
-    return fullText.trim();
+    return { totalPages: pdf.numPages, pages };
   } catch (err: any) {
     console.warn("PDF o'qishda xatolik:", err);
     throw new Error(`PDF faylni o'qib bo'lmadi: ${err.message || err}`);
   }
 }
 
-// 2. Word (.docx) Conversion (0 AI Tokens)
+// 2. Word (.docx) Conversion
 export async function docxToMarkdown(arrayBuffer: ArrayBuffer): Promise<string> {
   try {
     const result = await mammoth.convertToHtml({ arrayBuffer });
@@ -99,13 +152,10 @@ export async function docxToMarkdown(arrayBuffer: ArrayBuffer): Promise<string> 
   }
 }
 
-// 3. PowerPoint (.pptx) Conversion (0 AI Tokens)
-export async function pptxToMarkdown(arrayBuffer: ArrayBuffer): Promise<string> {
+// 3. PowerPoint (.pptx) Conversion
+export async function pptxToMarkdown(arrayBuffer: ArrayBuffer): Promise<{ totalSlides: number; slides: { slideNum: number; title: string; bullets: string[] }[] }> {
   try {
     const zip = await JSZip.loadAsync(arrayBuffer);
-    let md = `# Taqdimot Slaydlari\n\n`;
-    let slideIndex = 1;
-
     const slideFiles = Object.keys(zip.files)
       .filter((name) => /^ppt\/slides\/slide\d+\.xml$/i.test(name))
       .sort((a, b) => {
@@ -114,35 +164,63 @@ export async function pptxToMarkdown(arrayBuffer: ArrayBuffer): Promise<string> 
         return numA - numB;
       });
 
-    if (slideFiles.length === 0) {
-      return `> Taqdimot ichida o'qiladigan slayd matni topilmadi.`;
-    }
+    const slides: { slideNum: number; title: string; bullets: string[] }[] = [];
+    let slideIndex = 1;
 
     for (const slidePath of slideFiles) {
       const xml = await zip.files[slidePath].async("text");
       const textMatches = xml.match(/<a:t[^>]*>(.*?)<\/a:t>/g) || [];
       const slideTexts = textMatches
-        .map((m) => m.replace(/<[^>]+>/g, "").trim())
+        .map((m) => normalizeText(m.replace(/<[^>]+>/g, "").trim()))
         .filter((t) => t.length > 0);
 
-      if (slideTexts.length > 0) {
-        md += `## Slayd ${slideIndex}: ${slideTexts[0]}\n\n`;
-        const bulletPoints = slideTexts.slice(1);
-        for (const pt of bulletPoints) {
-          md += `- ${pt}\n`;
-        }
-        md += `\n---\n\n`;
-      }
+      const title = slideTexts.length > 0 ? slideTexts[0] : `Slayd ${slideIndex}`;
+      const bullets = slideTexts.length > 1 ? slideTexts.slice(1) : [];
+      slides.push({ slideNum: slideIndex, title, bullets });
       slideIndex++;
     }
 
-    return md.trim();
+    return { totalSlides: slides.length, slides };
   } catch (err: any) {
     throw new Error(`PowerPoint faylni o'qishda xatolik: ${err.message || err}`);
   }
 }
 
-// 4. CSV / TSV to Markdown Table
+// 4. Excel (.xlsx / .xls) to Markdown
+export function xlsxToMarkdown(arrayBuffer: ArrayBuffer, fileName: string): string {
+  const workbook = XLSX.read(arrayBuffer, { type: "array" });
+  const sheetCount = workbook.SheetNames.length;
+  const cleanTitle = fileName.replace(/\.[^/.]+$/, "");
+
+  let md = `# 📄 ${cleanTitle}\n\n`;
+  md += `> 📌 **Hujjat:** \`${fileName}\` | **Sahifalar (Vkladkalar):** ${sheetCount} ta | **Format:** Excel\n\n`;
+
+  if (sheetCount > 1) {
+    md += `## 📑 Mundarija (Vkladkalar)\n`;
+    for (const sheetName of workbook.SheetNames) {
+      md += `- [[#Sahifa: ${sheetName}|${sheetName}]]\n`;
+    }
+    md += `\n---\n\n`;
+  }
+
+  for (let i = 0; i < sheetCount; i++) {
+    const sheetName = workbook.SheetNames[i];
+    const sheet = workbook.Sheets[sheetName];
+    const csv = XLSX.utils.sheet_to_csv(sheet);
+    if (!csv.trim()) continue;
+
+    md += `## Sahifa: ${sheetName}\n\n`;
+    md += csvToMarkdown(csv, ",") + "\n\n";
+
+    if (i < sheetCount - 1) {
+      md += `---\n\n`;
+    }
+  }
+
+  return md.trim();
+}
+
+// 5. CSV / TSV to Markdown Table
 export function csvToMarkdown(content: string, delimiter: string = ","): string {
   const lines = content.split(/\r?\n/).filter((l) => l.trim().length > 0);
   if (lines.length === 0) return "";
@@ -156,13 +234,13 @@ export function csvToMarkdown(content: string, delimiter: string = ","): string 
       if (char === '"' || char === "'") {
         insideQuote = !insideQuote;
       } else if (char === delimiter && !insideQuote) {
-        row.push(current.trim());
+        row.push(normalizeText(current.trim()));
         current = "";
       } else {
         current += char;
       }
     }
-    row.push(current.trim());
+    row.push(normalizeText(current.trim()));
     return row.map((cell) => cell.replace(/^["']|["']$/g, "").replace(/\|/g, "\\|"));
   };
 
@@ -186,94 +264,6 @@ export function csvToMarkdown(content: string, delimiter: string = ","): string 
   return md;
 }
 
-// 5. Excel (.xlsx / .xls) to Markdown
-export function xlsxToMarkdown(arrayBuffer: ArrayBuffer): string {
-  const workbook = XLSX.read(arrayBuffer, { type: "array" });
-  let fullMd = "";
-
-  for (const sheetName of workbook.SheetNames) {
-    const sheet = workbook.Sheets[sheetName];
-    const csv = XLSX.utils.sheet_to_csv(sheet);
-    if (!csv.trim()) continue;
-
-    if (workbook.SheetNames.length > 1) {
-      fullMd += `## Sahifa: ${sheetName}\n\n`;
-    }
-    fullMd += csvToMarkdown(csv, ",") + "\n\n";
-  }
-
-  return fullMd.trim();
-}
-
-// 6. JSON to Markdown Table or formatted JSON
-export function jsonToMarkdown(content: string): string {
-  try {
-    const parsed = JSON.parse(content);
-    if (Array.isArray(parsed) && parsed.length > 0 && typeof parsed[0] === "object" && parsed[0] !== null) {
-      const keys = Array.from(new Set(parsed.flatMap((item) => Object.keys(item))));
-      let md = `| ${keys.join(" | ")} |\n| ${keys.map(() => "---").join(" | ")} |\n`;
-      for (const item of parsed) {
-        const row = keys.map((k) => {
-          const val = item[k];
-          if (val === undefined || val === null) return "";
-          if (typeof val === "object") return JSON.stringify(val).replace(/\|/g, "\\|");
-          return String(val).replace(/\|/g, "\\|");
-        });
-        md += `| ${row.join(" | ")} |\n`;
-      }
-      return md;
-    }
-
-    return "```json\n" + JSON.stringify(parsed, null, 2) + "\n```";
-  } catch {
-    return "```json\n" + content + "\n```";
-  }
-}
-
-// 7. Clean HTML to Markdown
-export function htmlToMarkdown(html: string): string {
-  try {
-    const cleanHtml = html
-      .replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, "")
-      .replace(/<style\b[^<]*(?:(?!<\/style>)<[^<]*)*<\/style>/gi, "");
-    return turndownService.turndown(cleanHtml).trim();
-  } catch {
-    return html.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
-  }
-}
-
-// 8. Code & Text to Markdown
-export function codeToMarkdown(code: string, extension: string): string {
-  const extMap: Record<string, string> = {
-    ts: "typescript",
-    tsx: "tsx",
-    js: "javascript",
-    jsx: "jsx",
-    py: "python",
-    java: "java",
-    cpp: "cpp",
-    c: "c",
-    cs: "csharp",
-    go: "go",
-    rs: "rust",
-    sql: "sql",
-    sh: "bash",
-    bash: "bash",
-    css: "css",
-    scss: "scss",
-    html: "html",
-    xml: "xml",
-    yaml: "yaml",
-    yml: "yaml",
-    json: "json",
-    md: "markdown",
-    txt: "text",
-    log: "log",
-  };
-  const lang = extMap[extension.toLowerCase()] || "";
-  return "```" + lang + "\n" + code + "\n```";
-}
-
 // Helper: Convert File/Blob to Base64
 export function fileToBase64(file: Blob): Promise<string> {
   return new Promise((resolve, reject) => {
@@ -288,57 +278,45 @@ export function fileToBase64(file: Blob): Promise<string> {
   });
 }
 
-// 9. Gemini Multimodal AI (OCR for Images, Speech-to-Text for Audio)
+// 6. Gemini Multimodal AI Call
 export async function convertWithGeminiApi(
   base64Data: string,
   mimeType: string,
   filename: string,
   apiKey: string,
-  options: ConversionOptions = {}
+  modelName: string = "gemini-2.5-flash",
+  customPrompt?: string
 ): Promise<{ markdown: string; tokensConsumed: number }> {
   if (!apiKey) {
-    throw new Error("Gemini AI orqali rasm/audio o'girish uchun API kalit talab qilinadi. Yuqoridagi 'API Kalit' tugmasi orqali kiriting.");
+    throw new Error("Gemini AI orqali OCR uchun API kalit talab qilinadi.");
   }
 
   const systemInstruction = `Siz Microsoft MarkItDown tamoyillari asosida ishlovchi universal fayl konvertatsiya tizimisiz.
-Vazifangiz: berilgan fayldagi barcha ma'lumotlarni, matnlarni, jadvallarni va audio ovozlarni toza, tushunarli, chiroyli Markdown (.md) formatiga aylantirish.
-
+Vazifangiz: berilgan fayldagi barcha ma'lumotlarni, matnlarni (jumladan Krill va Lotin harflari: қ, ғ, ҳ, ў), jadvallarni va audio ovozlarni toza, tushunarli, chiroyli Markdown (.md) formatiga aylantirish.
 Qoidalar:
-1. Rasm yoki skrinshot bo'lsa (OCR): Rasmdagi barcha ko'rinib turgan matnlar, yozuvlar, menyular, jadvallarni aniq o'qib, sarlavhalar va ro'yxatlar bilan toza Markdown ko'rinishida yozib bering.
-2. Audio fayl bo'lsa (Ovozli xabar, suhbat): Nutqni to'liq eshitib, matnga aylantiring (Transkripsiya).
-3. Jadvallar bo'lsa: Har doim toza Markdown jadvali (| Ustun 1 | Ustun 2 |) shaklida ifodalang.
-4. Hech qanday boshqa kirish yoki yakuniy tushuntirish so'zlari yozmang. Faqat toza Markdown matnini qaytaring.
-${options.customPrompt ? `Foydalanuvchining maxsus talabi: ${options.customPrompt}` : ""}`;
+1. Rasm yoki skrinshot bo'lsa (OCR): Barcha ko'rinib turgan matnlar, sarlavhalar va jadvallarni aniq o'qib, tartibli Markdown ko'rinishida yozib bering.
+2. Jadvallar bo'lsa: Har doim toza Markdown jadvali (| Ustun 1 | Ustun 2 |) shaklida ifodalang.
+3. Faqat toza Markdown qaytaring.
+${customPrompt ? `Maxsus talab: ${customPrompt}` : ""}`;
 
-  const promptText = `Ushbu "${filename}" (${mimeType}) faylidagi barcha matnlarni / ovozni to'liq ajratib olib, toza Markdown (.md) formatiga o'tkazib ber.`;
+  const promptText = `Ushbu "${filename}" (${mimeType}) faylidagi barcha matnlarni to'liq ajratib olib, toza Markdown formatiga o'tkazib ber.`;
 
   const response = await fetch(
-    `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`,
+    `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${apiKey}`,
     {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        system_instruction: {
-          parts: [{ text: systemInstruction }],
-        },
+        system_instruction: { parts: [{ text: systemInstruction }] },
         contents: [
           {
             parts: [
-              {
-                inline_data: {
-                  mime_type: mimeType,
-                  data: base64Data,
-                },
-              },
-              {
-                text: promptText,
-              },
+              { inline_data: { mime_type: mimeType, data: base64Data } },
+              { text: promptText },
             ],
           },
         ],
-        generationConfig: {
-          temperature: 0.1,
-        },
+        generationConfig: { temperature: 0.1 },
       }),
     }
   );
@@ -359,222 +337,195 @@ ${options.customPrompt ? `Foydalanuvchining maxsus talabi: ${options.customPromp
   return { markdown: rawMd.trim(), tokensConsumed: tokenUsage };
 }
 
-// 10. Web URL Conversion in Browser (via r.jina.ai)
-export async function convertUrlClient(
-  url: string,
-  options: ConversionOptions = {},
-  apiKey?: string
-): Promise<ConvertedItem> {
-  const startTime = Date.now();
-  let markdown = "";
-  let title = url;
-  let usedAi = false;
-  let tokensConsumed = 0;
-
-  try {
-    // Jina Reader is a free, high-speed CORS-friendly Web-to-Markdown proxy
-    const jinaUrl = `https://r.jina.ai/${url}`;
-    const res = await fetch(jinaUrl, {
-      headers: {
-        Accept: "text/markdown",
-      },
-    });
-
-    if (res.ok) {
-      markdown = await res.text();
-      // Extract title from markdown if available
-      const titleMatch = markdown.match(/^Title:\s*(.*)$/m) || markdown.match(/^#\s+(.*)$/m);
-      if (titleMatch) {
-        title = titleMatch[1].trim();
-      }
-    } else {
-      throw new Error(`Jina Reader error: ${res.statusText}`);
-    }
-  } catch (err: any) {
-    console.warn("Jina reader failed, trying standard fallback:", err);
-    // Fallback: try direct fetch or corsproxy
-    try {
-      const proxyRes = await fetch(`https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`);
-      const html = await proxyRes.text();
-      const titleMatch = html.match(/<title[^>]*>(.*?)<\/title>/i);
-      title = titleMatch ? titleMatch[1].trim() : url;
-      markdown = htmlToMarkdown(html);
-    } catch {
-      throw new Error(`Web havolani o'qib bo'lmadi: ${err.message}`);
-    }
+// 7. OpenAI / DeepSeek / Custom Vision API Call
+export async function convertWithOpenAiApi(
+  base64Data: string,
+  mimeType: string,
+  filename: string,
+  apiKey: string,
+  endpoint: string,
+  modelName: string = "gpt-4o-mini",
+  customPrompt?: string
+): Promise<{ markdown: string; tokensConsumed: number }> {
+  if (!apiKey) {
+    throw new Error("AI API kaliti kiritilmagan.");
   }
 
-  if (options.includeFrontmatter) {
-    const frontmatter = {
-      title,
-      source_url: url,
-      converted_at: new Date().toISOString(),
-      converter: "MarkItDown Studio Web Engine",
-      word_count: countWords(markdown),
-      estimated_tokens: estimateTokens(markdown),
-    };
-    const yaml =
-      `---\n` +
-      Object.entries(frontmatter)
-        .map(([k, v]) => `${k}: ${typeof v === "string" ? `"${v}"` : v}`)
-        .join("\n") +
-      `\n---\n\n`;
-    markdown = yaml + markdown;
+  const systemInstruction = `Siz universal fayl konvertatsiya tizimisiz. Tasvirdagi barcha matnlar va jadvallarni toza Markdown ko'rinishida yozib bering.`;
+  const dataUrl = `data:${mimeType};base64,{base64Data}`;
+
+  const response = await fetch(endpoint, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${apiKey}`,
+    },
+    body: JSON.stringify({
+      model: modelName,
+      messages: [
+        { role: "system", content: systemInstruction },
+        {
+          role: "user",
+          content: [
+            { type: "text", text: `Ushbu "${filename}" tasvirdagi barcha matnlarni toza Markdown formatida yozib ber.` },
+            { type: "image_url", image_url: { url: dataUrl } },
+          ],
+        },
+      ],
+      temperature: 0.1,
+    }),
+  });
+
+  const data = await response.json();
+  if (!response.ok || data.error) {
+    throw new Error(data.error?.message || "AI so'rovida xatolik.");
   }
 
-  const durationMs = Date.now() - startTime;
-  const wordCount = countWords(markdown);
-  const charCount = markdown.length;
-  const lineCount = markdown.split("\n").length;
-  const estimatedTokens = estimateTokens(markdown);
-
-  return {
-    id: `url_${Date.now()}`,
-    filename: title,
-    originalFormat: "URL",
-    originalSize: new Blob([markdown]).size,
-    markdown,
-    markdownSize: new Blob([markdown]).size,
-    wordCount,
-    charCount,
-    lineCount,
-    estimatedTokens,
-    durationMs,
-    usedAi,
-    tokensConsumed,
-    engine: "local",
-    sourceUrl: url,
-    status: "success",
-  };
+  let rawMd = data.choices?.[0]?.message?.content || "";
+  if (rawMd.startsWith("```markdown\n") && rawMd.endsWith("\n```")) {
+    rawMd = rawMd.slice(12, -4);
+  }
+  const tokenUsage = data.usage?.total_tokens || estimateTokens(rawMd);
+  return { markdown: rawMd.trim(), tokensConsumed: tokenUsage };
 }
 
-// 11. Main Browser File Conversion Dispatcher
+// 8. Main Browser File Conversion Dispatcher with Obsidian Formatting
 export async function convertFileClient(
   file: File,
   options: ConversionOptions = {},
-  apiKey?: string
+  apiKey?: string,
+  provider: string = "GoogleGemini",
+  modelName: string = "gemini-2.5-flash",
+  customBaseUrl?: string
 ): Promise<ConvertedItem[]> {
   const startTime = Date.now();
   const ext = (file.name.split(".").pop() || "").toLowerCase();
-  const filename = file.name;
+  const cleanTitle = file.name.replace(/\.[^/.]+$/, "");
+  const hasApiKey = Boolean(apiKey && apiKey.trim().length > 0);
+
   let markdown = "";
   let usedAi = false;
   let tokensConsumed = 0;
-  let engine: "local" | "gemini-ai" = "local";
+  let engine = "MarkItDown Browser Engine";
 
   const isImageOrAudio =
     file.type.startsWith("image/") ||
     file.type.startsWith("audio/") ||
     ["png", "jpg", "jpeg", "webp", "gif", "svg", "mp3", "wav", "m4a", "ogg"].includes(ext);
 
-  // If ZIP archive -> process recursively
-  if (ext === "zip") {
-    const arrayBuffer = await file.arrayBuffer();
-    const zip = await JSZip.loadAsync(arrayBuffer);
-    const results: ConvertedItem[] = [];
-
-    for (const [relativePath, zipEntry] of Object.entries(zip.files)) {
-      if (zipEntry.dir) continue;
-      if (relativePath.startsWith("__MACOSX/") || relativePath.startsWith(".")) continue;
-
-      const innerBuffer = await zipEntry.async("arraybuffer");
-      const innerFilename = relativePath.split("/").pop() || relativePath;
-      const innerFile = new File([innerBuffer], innerFilename);
-      const innerResults = await convertFileClient(innerFile, options, apiKey);
-      results.push(...innerResults);
-    }
-    return results;
-  }
-
-  // If Image or Audio -> Gemini Multimodal AI
+  // 1. Image or Audio
   if (isImageOrAudio) {
-    usedAi = true;
-    engine = "gemini-ai";
-    const base64 = await fileToBase64(file);
-    const effectiveMime = file.type || `image/${ext}`;
-    const aiResult = await convertWithGeminiApi(base64, effectiveMime, filename, apiKey || "", options);
-    markdown = aiResult.markdown;
-    tokensConsumed = aiResult.tokensConsumed;
-  } else {
-    // Documents and text files (0 AI tokens, 100% local in browser)
-    const arrayBuffer = await file.arrayBuffer();
+    const isAudio = ["mp3", "wav", "m4a", "ogg"].includes(ext);
+    if (hasApiKey) {
+      usedAi = true;
+      engine = `${provider} (${modelName})`;
+      const base64 = await fileToBase64(file);
+      const effectiveMime = file.type || (isAudio ? `audio/${ext}` : `image/${ext}`);
+      const aiResult = await convertWithGeminiApi(base64, effectiveMime, file.name, apiKey!, modelName, options.customPrompt);
+      tokensConsumed = aiResult.tokensConsumed;
 
-    if (ext === "pdf") {
-      try {
-        markdown = await pdfToMarkdown(arrayBuffer);
-        // If scanned image PDF with no text and user has Gemini key
-        if ((!markdown || markdown.length < 20) && apiKey) {
-          usedAi = true;
-          engine = "gemini-ai";
-          const base64 = await fileToBase64(file);
-          const aiResult = await convertWithGeminiApi(base64, "application/pdf", filename, apiKey, options);
-          markdown = aiResult.markdown;
-          tokensConsumed = aiResult.tokensConsumed;
-        }
-      } catch (err: any) {
-        if (apiKey) {
-          usedAi = true;
-          engine = "gemini-ai";
-          const base64 = await fileToBase64(file);
-          const aiResult = await convertWithGeminiApi(base64, "application/pdf", filename, apiKey, options);
-          markdown = aiResult.markdown;
-          tokensConsumed = aiResult.tokensConsumed;
-        } else {
-          throw err;
+      markdown = `# 📄 ${cleanTitle}\n\n> 📌 **${isAudio ? "Audio" : "Tasvir"}:** \`${file.name}\` | **Format:** ${ext.toUpperCase()}\n\n`;
+      if (!isAudio) markdown += `![${file.name}](${file.name})\n\n`;
+      markdown += `> 🤖 **[AI OCR / ${isAudio ? "Audio Transkripsiya" : "Tasvir Tahlili"}]** *(Ushbu qism \`${provider}\` - \`${modelName}\` modeli yordamida tayyorlandi, tekshirib ko'ring)*:\n>\n` +
+        aiResult.markdown.split("\n").map((l) => `> ${l}`).join("\n");
+    } else {
+      markdown = `# 📄 ${cleanTitle}\n\n> 📌 **${isAudio ? "Audio" : "Tasvir"}:** \`${file.name}\` | **Format:** ${ext.toUpperCase()}\n\n`;
+      if (!isAudio) markdown += `![${file.name}](${file.name})\n\n`;
+      markdown += `> ⚠️ *(Ushbu rasm/audio yuklandi. AI API kaliti ulanmagani sababli matn ajratib olinmadi)*\n`;
+    }
+  } else if (ext === "pdf") {
+    // 2. PDF Conversion
+    const arrayBuffer = await file.arrayBuffer();
+    const { totalPages, pages } = await pdfToMarkdown(arrayBuffer);
+    const isScannedPdf = pages.every((p) => p.text.length < 30);
+
+    let docBody = "";
+
+    if (isScannedPdf) {
+      if (hasApiKey) {
+        usedAi = true;
+        engine = `${provider} Vision AI`;
+        const base64 = await fileToBase64(file);
+        const aiResult = await convertWithGeminiApi(base64, "application/pdf", file.name, apiKey!, modelName, options.customPrompt);
+        docBody = aiResult.markdown;
+        tokensConsumed = aiResult.tokensConsumed;
+      } else {
+        for (const p of pages) {
+          docBody += `## Sahifa ${p.pageNum}\n\n`;
+          docBody += `![page_${p.pageNum}.png](page_${p.pageNum}.png)\n`;
+          docBody += `> ⚠️ *(Ushbu rasm saqlandi. AI API kaliti ulanmagani sababli rasmdagi matn ajratib olinmadi)*\n\n---\n\n`;
         }
       }
-    } else if (ext === "docx" || ext === "doc") {
-      markdown = await docxToMarkdown(arrayBuffer);
-    } else if (ext === "pptx" || ext === "ppt") {
-      markdown = await pptxToMarkdown(arrayBuffer);
-    } else if (ext === "xlsx" || ext === "xls" || ext === "ods") {
-      markdown = xlsxToMarkdown(arrayBuffer);
-    } else if (ext === "csv") {
-      const text = await file.text();
-      markdown = csvToMarkdown(text, ",");
-    } else if (ext === "tsv") {
-      const text = await file.text();
-      markdown = csvToMarkdown(text, "\t");
-    } else if (ext === "json") {
-      const text = await file.text();
-      markdown = jsonToMarkdown(text);
-    } else if (ext === "html" || ext === "htm") {
-      const text = await file.text();
-      markdown = htmlToMarkdown(text);
-    } else if (
-      ["txt", "log", "py", "js", "ts", "tsx", "jsx", "java", "c", "cpp", "h", "cs", "go", "rs", "sql", "sh", "css", "yaml", "yml", "xml", "svg"].includes(ext)
-    ) {
-      const text = await file.text();
-      markdown = codeToMarkdown(text, ext);
     } else {
-      markdown = await file.text();
+      for (let i = 0; i < pages.length; i++) {
+        const p = pages[i];
+        if (totalPages > 1) {
+          docBody += `## Sahifa ${p.pageNum}\n\n`;
+        }
+        if (p.text) {
+          docBody += p.text + "\n\n";
+        }
+        if (p.hasImages) {
+          if (hasApiKey) {
+            docBody += `> 🤖 **[AI OCR / Tasvir Tahlili]** *(Ushbu qism \`${provider}\` - \`${modelName}\` modeli yordamida tekshirildi)*\n\n`;
+          } else {
+            docBody += `> ⚠️ *(Ushbu sahifada rasm mavjud. AI API kaliti ulanmagani sababli rasmdagi matn ajratib olinmadi)*\n\n`;
+          }
+        }
+        if (totalPages > 1 && i < pages.length - 1) {
+          docBody += `---\n\n`;
+        }
+      }
     }
-  }
 
-  // Add frontmatter if requested
-  let frontmatter: Record<string, any> | undefined;
-  if (options.includeFrontmatter) {
-    const wordCount = countWords(markdown);
-    const estTokens = estimateTokens(markdown);
-    frontmatter = {
-      sarlavha: filename.replace(/\.[^/.]+$/, ""),
-      fayl_nomi: filename,
-      format: ext.toUpperCase(),
-      vaqt: new Date().toISOString(),
-      dvigatel: engine === "local" ? "Lokal Dvigatel (0 Token)" : "Gemini Multimodal AI",
-      ai_token_sarfi: tokensConsumed,
-      sozlar_soni: wordCount,
-      taxminiy_tokenlar: estTokens,
-    };
-
-    const yamlBlock =
-      `---\n` +
-      Object.entries(frontmatter)
-        .map(([k, v]) => `${k}: ${typeof v === "string" ? `"${v}"` : v}`)
-        .join("\n") +
-      `\n---\n\n`;
-
-    markdown = yamlBlock + markdown;
+    // Obsidian Header & TOC
+    let obsHeader = `# 📄 ${cleanTitle}\n\n> 📌 **Hujjat:** \`${file.name}\` | **Sahifalar:** ${totalPages} ta | **Format:** PDF\n\n`;
+    if (totalPages > 1) {
+      obsHeader += `## 📑 Mundarija\n`;
+      for (let i = 1; i <= totalPages; i++) {
+        obsHeader += `- [[#Sahifa ${i}|Sahifa ${i}]]\n`;
+      }
+      obsHeader += `\n---\n\n`;
+    }
+    markdown = obsHeader + docBody.trim();
+  } else if (ext === "docx" || ext === "doc") {
+    // 3. Word
+    const arrayBuffer = await file.arrayBuffer();
+    const bodyText = await docxToMarkdown(arrayBuffer);
+    markdown = `# 📄 ${cleanTitle}\n\n> 📌 **Hujjat:** \`${file.name}\` | **Format:** Word (.docx)\n\n---\n\n` + bodyText;
+  } else if (ext === "xlsx" || ext === "xls" || ext === "ods") {
+    // 4. Excel
+    const arrayBuffer = await file.arrayBuffer();
+    markdown = xlsxToMarkdown(arrayBuffer, file.name);
+  } else if (ext === "pptx" || ext === "ppt") {
+    // 5. PowerPoint
+    const arrayBuffer = await file.arrayBuffer();
+    const { totalSlides, slides } = await pptxToMarkdown(arrayBuffer);
+    let pptMd = `# 📄 ${cleanTitle}\n\n> 📌 **Hujjat:** \`${file.name}\` | **Slaydlar:** ${totalSlides} ta | **Format:** PowerPoint (.pptx)\n\n`;
+    if (totalSlides > 1) {
+      pptMd += `## 📑 Mundarija (Slaydlar)\n`;
+      for (const s of slides) {
+        pptMd += `- [[#Slayd ${s.slideNum}: ${s.title}|Slayd ${s.slideNum}: ${s.title}]]\n`;
+      }
+      pptMd += `\n---\n\n`;
+    }
+    for (let i = 0; i < slides.length; i++) {
+      const s = slides[i];
+      pptMd += `## Slayd ${s.slideNum}: ${s.title}\n\n`;
+      for (const b of s.bullets) {
+        pptMd += `- ${b}\n`;
+      }
+      pptMd += `\n`;
+      if (i < slides.length - 1) pptMd += `---\n\n`;
+    }
+    markdown = pptMd.trim();
+  } else if (ext === "csv" || ext === "tsv") {
+    const text = await file.text();
+    const tableMd = csvToMarkdown(text, ext === "tsv" ? "\t" : ",");
+    markdown = `# 📄 ${cleanTitle}\n\n> 📌 **Hujjat:** \`${file.name}\` | **Format:** ${ext.toUpperCase()}\n\n---\n\n` + tableMd;
+  } else {
+    const text = await file.text();
+    markdown = `# 📄 ${cleanTitle}\n\n> 📌 **Hujjat:** \`${file.name}\` | **Format:** ${ext.toUpperCase()}\n\n---\n\n` + "```" + ext + "\n" + text + "\n```";
   }
 
   const durationMs = Date.now() - startTime;
@@ -586,7 +537,7 @@ export async function convertFileClient(
   return [
     {
       id: `conv_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
-      filename,
+      filename: file.name,
       originalFormat: ext.toUpperCase() || "UNKNOWN",
       originalSize: file.size,
       markdown,
@@ -599,77 +550,58 @@ export async function convertFileClient(
       usedAi,
       tokensConsumed,
       engine,
-      frontmatter,
-      previewSnippet: markdown.slice(0, 300),
       status: "success",
     },
   ];
 }
 
-// 12. Convert Raw Text
-export function convertTextClient(
-  text: string,
-  format: string,
-  filename: string,
-  options: ConversionOptions = {}
-): ConvertedItem {
+// 9. Convert URL via r.jina.ai
+export async function convertUrlClient(
+  url: string,
+  options: ConversionOptions = {},
+  apiKey?: string
+): Promise<ConvertedItem> {
   const startTime = Date.now();
   let markdown = "";
+  let title = url;
 
-  if (format === "json") {
-    markdown = jsonToMarkdown(text);
-  } else if (format === "csv") {
-    markdown = csvToMarkdown(text, ",");
-  } else if (format === "tsv") {
-    markdown = csvToMarkdown(text, "\t");
-  } else if (format === "html") {
-    markdown = htmlToMarkdown(text);
-  } else if (["py", "js", "ts", "tsx", "sql", "css", "yaml", "xml", "sh"].includes(format)) {
-    markdown = codeToMarkdown(text, format);
-  } else {
-    markdown = text;
+  try {
+    const jinaUrl = `https://r.jina.ai/${url}`;
+    const res = await fetch(jinaUrl, { headers: { Accept: "text/markdown" } });
+
+    if (res.ok) {
+      markdown = await res.text();
+      const titleMatch = markdown.match(/^Title:\s*(.*)$/m) || markdown.match(/^#\s+(.*)$/m);
+      if (titleMatch) title = titleMatch[1].trim();
+    } else {
+      throw new Error(`Jina error: ${res.statusText}`);
+    }
+  } catch (err: any) {
+    const proxyRes = await fetch(`https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`);
+    const html = await proxyRes.text();
+    const titleMatch = html.match(/<title[^>]*>(.*?)<\/title>/i);
+    title = titleMatch ? titleMatch[1].trim() : url;
+    markdown = turndownService.turndown(html);
   }
 
-  if (options.includeFrontmatter) {
-    const wordCount = countWords(markdown);
-    const estTokens = estimateTokens(markdown);
-    const frontmatter = {
-      sarlavha: filename.replace(/\.[^/.]+$/, ""),
-      format: format.toUpperCase(),
-      vaqt: new Date().toISOString(),
-      sozlar_soni: wordCount,
-      taxminiy_tokenlar: estTokens,
-    };
-    const yaml =
-      `---\n` +
-      Object.entries(frontmatter)
-        .map(([k, v]) => `${k}: ${typeof v === "string" ? `"${v}"` : v}`)
-        .join("\n") +
-      `\n---\n\n`;
-    markdown = yaml + markdown;
-  }
-
+  const cleanMd = `# 🌐 ${title}\n\n> 📌 **Manba:** [${url}](${url})\n\n---\n\n${markdown.trim()}`;
   const durationMs = Date.now() - startTime;
-  const wordCount = countWords(markdown);
-  const charCount = markdown.length;
-  const lineCount = markdown.split("\n").length;
-  const estimatedTokens = estimateTokens(markdown);
 
   return {
-    id: `txt_${Date.now()}`,
-    filename: filename || `snippet.${format}`,
-    originalFormat: format.toUpperCase(),
-    originalSize: new Blob([text]).size,
-    markdown,
-    markdownSize: new Blob([markdown]).size,
-    wordCount,
-    charCount,
-    lineCount,
-    estimatedTokens,
+    id: `url_${Date.now()}`,
+    filename: title,
+    originalFormat: "URL",
+    originalSize: new Blob([cleanMd]).size,
+    markdown: cleanMd,
+    markdownSize: new Blob([cleanMd]).size,
+    wordCount: countWords(cleanMd),
+    charCount: cleanMd.length,
+    lineCount: cleanMd.split("\n").length,
+    estimatedTokens: estimateTokens(cleanMd),
     durationMs,
     usedAi: false,
-    tokensConsumed: 0,
-    engine: "local",
+    engine: "MarkItDown Web Reader",
+    sourceUrl: url,
     status: "success",
   };
 }

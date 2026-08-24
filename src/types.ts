@@ -20,7 +20,7 @@ export interface ConvertedItem {
   durationMs: number;
   usedAi: boolean;
   tokensConsumed?: number;
-  engine?: "local" | "gemini-ai";
+  engine?: string;
   frontmatter?: Record<string, any>;
   summary?: string;
   previewSnippet?: string;
@@ -34,3 +34,12 @@ export interface FormatCategory {
   formats: string[];
   capabilities: string[];
 }
+
+export interface UserProfile {
+  id: string;
+  name: string;
+  email: string;
+  picture: string;
+}
+
+export type ThemeType = "MidnightGlass" | "ObsidianDark" | "CyberpunkNeon" | "FrostedCrystal";
