@@ -68,8 +68,8 @@ function normalizeText(text: string): string {
   if (!text) return "";
   return text
     .normalize("NFC")
-    .replace(/\u00A0/g, " ") // Non-breaking space to regular space
-    .replace(/[\u200B-\u200D\uFEFF]/g, ""); // Zero-width spaces
+    .replace(/\u00A0/g, " ")
+    .replace(/[\u200B-\u200D\uFEFF]/g, "");
 }
 
 // 1. PDF Conversion with full CMap and Cyrillic glyph support
@@ -87,21 +87,18 @@ export async function pdfToMarkdown(arrayBuffer: ArrayBuffer): Promise<{ totalPa
     const pages: { pageNum: number; text: string; hasImages: boolean }[] = [];
 
     for (let pageNum = 1; pageNum <= pdf.numPages; pageNum++) {
-      // Yield to UI thread every page to prevent browser freeze
       await new Promise((r) => setTimeout(r, 0));
 
       const page = await pdf.getPage(pageNum);
       const textContent = await page.getTextContent();
 
-      // Cluster items by Y coordinate to preserve proper line breaks and Cyrillic words
       const lineMap: Map<number, { x: number; str: string }[]> = new Map();
 
       for (const item of textContent.items as any[]) {
         if (!item.str) continue;
-        const y = Math.round(item.transform[5]); // Y coordinate
-        const x = item.transform[4]; // X coordinate
+        const y = Math.round(item.transform[5]);
+        const x = item.transform[4];
 
-        // Find nearest Y within 3 pixels threshold
         let targetY = y;
         for (const existingY of lineMap.keys()) {
           if (Math.abs(existingY - y) <= 3) {
@@ -116,7 +113,6 @@ export async function pdfToMarkdown(arrayBuffer: ArrayBuffer): Promise<{ totalPa
         lineMap.get(targetY)!.push({ x, str: normalizeText(item.str) });
       }
 
-      // Sort lines top to bottom (descending Y)
       const sortedYs = Array.from(lineMap.keys()).sort((a, b) => b - a);
       const lines: string[] = [];
 
@@ -129,7 +125,7 @@ export async function pdfToMarkdown(arrayBuffer: ArrayBuffer): Promise<{ totalPa
       }
 
       const pageText = lines.join("\n");
-      const hasImages = textContent.items.length < 5; // likely scanned page if very few text items
+      const hasImages = textContent.items.length < 5;
 
       pages.push({ pageNum, text: pageText, hasImages });
     }
@@ -193,15 +189,8 @@ export function xlsxToMarkdown(arrayBuffer: ArrayBuffer, fileName: string): stri
   const cleanTitle = fileName.replace(/\.[^/.]+$/, "");
 
   let md = `# 📄 ${cleanTitle}\n\n`;
-  md += `> 📌 **Hujjat:** \`${fileName}\` | **Sahifalar (Vkladkalar):** ${sheetCount} ta | **Format:** Excel\n\n`;
-
-  if (sheetCount > 1) {
-    md += `## 📑 Mundarija (Vkladkalar)\n`;
-    for (const sheetName of workbook.SheetNames) {
-      md += `- [[#Sahifa: ${sheetName}|${sheetName}]]\n`;
-    }
-    md += `\n---\n\n`;
-  }
+  md += `> 📌 **Hujjat:** \`${fileName}\` | **Sahifalar:** ${sheetCount} ta | **Format:** Excel\n\n`;
+  md += `---\n\n`;
 
   for (let i = 0; i < sheetCount; i++) {
     const sheetName = workbook.SheetNames[i];
@@ -209,7 +198,9 @@ export function xlsxToMarkdown(arrayBuffer: ArrayBuffer, fileName: string): stri
     const csv = XLSX.utils.sheet_to_csv(sheet);
     if (!csv.trim()) continue;
 
-    md += `## Sahifa: ${sheetName}\n\n`;
+    if (sheetCount > 1) {
+      md += `## Sahifa: ${sheetName}\n\n`;
+    }
     md += csvToMarkdown(csv, ",") + "\n\n";
 
     if (i < sheetCount - 1) {
@@ -337,59 +328,7 @@ ${customPrompt ? `Maxsus talab: ${customPrompt}` : ""}`;
   return { markdown: rawMd.trim(), tokensConsumed: tokenUsage };
 }
 
-// 7. OpenAI / DeepSeek / Custom Vision API Call
-export async function convertWithOpenAiApi(
-  base64Data: string,
-  mimeType: string,
-  filename: string,
-  apiKey: string,
-  endpoint: string,
-  modelName: string = "gpt-4o-mini",
-  customPrompt?: string
-): Promise<{ markdown: string; tokensConsumed: number }> {
-  if (!apiKey) {
-    throw new Error("AI API kaliti kiritilmagan.");
-  }
-
-  const systemInstruction = `Siz universal fayl konvertatsiya tizimisiz. Tasvirdagi barcha matnlar va jadvallarni toza Markdown ko'rinishida yozib bering.`;
-  const dataUrl = `data:${mimeType};base64,{base64Data}`;
-
-  const response = await fetch(endpoint, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${apiKey}`,
-    },
-    body: JSON.stringify({
-      model: modelName,
-      messages: [
-        { role: "system", content: systemInstruction },
-        {
-          role: "user",
-          content: [
-            { type: "text", text: `Ushbu "${filename}" tasvirdagi barcha matnlarni toza Markdown formatida yozib ber.` },
-            { type: "image_url", image_url: { url: dataUrl } },
-          ],
-        },
-      ],
-      temperature: 0.1,
-    }),
-  });
-
-  const data = await response.json();
-  if (!response.ok || data.error) {
-    throw new Error(data.error?.message || "AI so'rovida xatolik.");
-  }
-
-  let rawMd = data.choices?.[0]?.message?.content || "";
-  if (rawMd.startsWith("```markdown\n") && rawMd.endsWith("\n```")) {
-    rawMd = rawMd.slice(12, -4);
-  }
-  const tokenUsage = data.usage?.total_tokens || estimateTokens(rawMd);
-  return { markdown: rawMd.trim(), tokensConsumed: tokenUsage };
-}
-
-// 8. Main Browser File Conversion Dispatcher with Obsidian Formatting
+// 7. Main Browser File Conversion Dispatcher without Mundarija
 export async function convertFileClient(
   file: File,
   options: ConversionOptions = {},
@@ -413,7 +352,6 @@ export async function convertFileClient(
     file.type.startsWith("audio/") ||
     ["png", "jpg", "jpeg", "webp", "gif", "svg", "mp3", "wav", "m4a", "ogg"].includes(ext);
 
-  // 1. Image or Audio
   if (isImageOrAudio) {
     const isAudio = ["mp3", "wav", "m4a", "ogg"].includes(ext);
     if (hasApiKey) {
@@ -434,7 +372,6 @@ export async function convertFileClient(
       markdown += `> ⚠️ *(Ushbu rasm/audio yuklandi. AI API kaliti ulanmagani sababli matn ajratib olinmadi)*\n`;
     }
   } else if (ext === "pdf") {
-    // 2. PDF Conversion
     const arrayBuffer = await file.arrayBuffer();
     const { totalPages, pages } = await pdfToMarkdown(arrayBuffer);
     const isScannedPdf = pages.every((p) => p.text.length < 30);
@@ -478,37 +415,18 @@ export async function convertFileClient(
       }
     }
 
-    // Obsidian Header & TOC
-    let obsHeader = `# 📄 ${cleanTitle}\n\n> 📌 **Hujjat:** \`${file.name}\` | **Sahifalar:** ${totalPages} ta | **Format:** PDF\n\n`;
-    if (totalPages > 1) {
-      obsHeader += `## 📑 Mundarija\n`;
-      for (let i = 1; i <= totalPages; i++) {
-        obsHeader += `- [[#Sahifa ${i}|Sahifa ${i}]]\n`;
-      }
-      obsHeader += `\n---\n\n`;
-    }
-    markdown = obsHeader + docBody.trim();
+    markdown = `# 📄 ${cleanTitle}\n\n> 📌 **Hujjat:** \`${file.name}\` | **Sahifalar:** ${totalPages} ta | **Format:** PDF\n\n---\n\n` + docBody.trim();
   } else if (ext === "docx" || ext === "doc") {
-    // 3. Word
     const arrayBuffer = await file.arrayBuffer();
     const bodyText = await docxToMarkdown(arrayBuffer);
     markdown = `# 📄 ${cleanTitle}\n\n> 📌 **Hujjat:** \`${file.name}\` | **Format:** Word (.docx)\n\n---\n\n` + bodyText;
   } else if (ext === "xlsx" || ext === "xls" || ext === "ods") {
-    // 4. Excel
     const arrayBuffer = await file.arrayBuffer();
     markdown = xlsxToMarkdown(arrayBuffer, file.name);
   } else if (ext === "pptx" || ext === "ppt") {
-    // 5. PowerPoint
     const arrayBuffer = await file.arrayBuffer();
     const { totalSlides, slides } = await pptxToMarkdown(arrayBuffer);
-    let pptMd = `# 📄 ${cleanTitle}\n\n> 📌 **Hujjat:** \`${file.name}\` | **Slaydlar:** ${totalSlides} ta | **Format:** PowerPoint (.pptx)\n\n`;
-    if (totalSlides > 1) {
-      pptMd += `## 📑 Mundarija (Slaydlar)\n`;
-      for (const s of slides) {
-        pptMd += `- [[#Slayd ${s.slideNum}: ${s.title}|Slayd ${s.slideNum}: ${s.title}]]\n`;
-      }
-      pptMd += `\n---\n\n`;
-    }
+    let pptMd = `# 📄 ${cleanTitle}\n\n> 📌 **Hujjat:** \`${file.name}\` | **Slaydlar:** ${totalSlides} ta | **Format:** PowerPoint (.pptx)\n\n---\n\n`;
     for (let i = 0; i < slides.length; i++) {
       const s = slides[i];
       pptMd += `## Slayd ${s.slideNum}: ${s.title}\n\n`;
@@ -555,7 +473,7 @@ export async function convertFileClient(
   ];
 }
 
-// 9. Convert URL via r.jina.ai
+// 8. Convert URL via r.jina.ai
 export async function convertUrlClient(
   url: string,
   options: ConversionOptions = {},

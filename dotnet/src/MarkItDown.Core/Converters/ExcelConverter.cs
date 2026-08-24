@@ -30,21 +30,10 @@ public class ExcelConverter
 
         sb.AppendLine($"# 📄 {cleanTitle}");
         sb.AppendLine();
-        sb.AppendLine($"> 📌 **Hujjat:** `{fileName}` | **Sahifalar (Vkladkalar):** {sheetCount} ta | **Format:** Excel");
+        sb.AppendLine($"> 📌 **Hujjat:** `{fileName}` | **Sahifalar:** {sheetCount} ta | **Format:** Excel");
         sb.AppendLine();
-
-        if (sheetCount > 1)
-        {
-            sb.AppendLine("## 📑 Mundarija (Vkladkalar)");
-            for (var i = 0; i < sheetCount; i++)
-            {
-                var name = result.Tables[i].TableName;
-                sb.AppendLine($"- [[#Sahifa: {name}|{name}]]");
-            }
-            sb.AppendLine();
-            sb.AppendLine("---");
-            sb.AppendLine();
-        }
+        sb.AppendLine("---");
+        sb.AppendLine();
 
         for (var i = 0; i < sheetCount; i++)
         {
@@ -52,8 +41,11 @@ public class ExcelConverter
             var table = result.Tables[i];
             if (table.Rows.Count == 0) continue;
 
-            sb.AppendLine($"## Sahifa: {table.TableName}");
-            sb.AppendLine();
+            if (sheetCount > 1)
+            {
+                sb.AppendLine($"## Sahifa: {table.TableName}");
+                sb.AppendLine();
+            }
 
             var mdTable = ConvertDataTableToMarkdown(table);
             if (!string.IsNullOrWhiteSpace(mdTable))

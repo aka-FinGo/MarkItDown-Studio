@@ -45,21 +45,10 @@ public class PowerPointConverter
         var sb = new StringBuilder();
         sb.AppendLine($"# 📄 {Path.GetFileNameWithoutExtension(fileName)}");
         sb.AppendLine();
-        sb.AppendLine($"> 📌 **Hujjat:** `{fileName}` | **Slaydlar soni:** {slideCount} ta | **Format:** PowerPoint (.pptx)");
+        sb.AppendLine($"> 📌 **Hujjat:** `{fileName}` | **Slaydlar:** {slideCount} ta | **Format:** PowerPoint (.pptx)");
         sb.AppendLine();
-
-        // TOC
-        if (slideCount > 1)
-        {
-            sb.AppendLine("## 📑 Mundarija (Slaydlar)");
-            for (var i = 1; i <= slideCount; i++)
-            {
-                sb.AppendLine($"- [[#Slayd {i}|Slayd {i}]]");
-            }
-            sb.AppendLine();
-            sb.AppendLine("---");
-            sb.AppendLine();
-        }
+        sb.AppendLine("---");
+        sb.AppendLine();
 
         var hasApiKey = options.EnableAi && aiConfig != null && !string.IsNullOrWhiteSpace(aiConfig.ApiKey);
         var slideIndex = 1;

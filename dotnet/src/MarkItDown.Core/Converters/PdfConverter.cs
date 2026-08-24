@@ -80,7 +80,7 @@ public class PdfConverter
             if (options.EnableAi && aiConfig != null && !string.IsNullOrWhiteSpace(aiConfig.ApiKey))
             {
                 var (aiResult, _) = await _aiClient.ConvertWithAiAsync(pdfBytes, "application/pdf", fileName, aiConfig, options.CustomPrompt, ct);
-                return FormatObsidianDocument(fileName, totalPages > 0 ? totalPages : 1, aiResult);
+                return FormatDocument(fileName, totalPages > 0 ? totalPages : 1, aiResult);
             }
 
             throw new InvalidOperationException($"PDF faylni o'qishda xatolik: {ex.Message}", ex);
@@ -89,7 +89,6 @@ public class PdfConverter
         var isScannedPdf = !hasSufficientText || pageTextList.All(p => p.Text.Length < 30);
         var hasApiKey = options.EnableAi && aiConfig != null && !string.IsNullOrWhiteSpace(aiConfig.ApiKey);
 
-        // Make sure attachment directory exists if there are images
         if (pageTextList.Any(p => p.Images.Count > 0))
         {
             try { Directory.CreateDirectory(fullAttachmentPath); } catch { }
@@ -103,10 +102,10 @@ public class PdfConverter
             if (aiConfig.Provider == AiProvider.GoogleGemini)
             {
                 var (aiResult, _) = await _aiClient.ConvertWithAiAsync(pdfBytes, "application/pdf", fileName, aiConfig, options.CustomPrompt, ct);
-                return FormatObsidianDocument(fileName, totalPages, aiResult);
+                return FormatDocument(fileName, totalPages, aiResult);
             }
 
-            // OpenAI / Claude / DeepSeek / Ollama: process each page image
+            // Other AI providers: process each page image
             for (var idx = 0; idx < pageTextList.Count; idx++)
             {
                 var (pageNum, _, images) = pageTextList[idx];
@@ -139,10 +138,10 @@ public class PdfConverter
                 }
             }
 
-            return FormatObsidianDocument(fileName, totalPages, bodySb.ToString());
+            return FormatDocument(fileName, totalPages, bodySb.ToString());
         }
 
-        // 2. Normal or Scanned without Key
+        // 2. Normal PDF or Scanned without Key
         for (var idx = 0; idx < pageTextList.Count; idx++)
         {
             var (pageNum, text, images) = pageTextList[idx];
@@ -182,7 +181,7 @@ public class PdfConverter
                     }
                     catch (Exception ex)
                     {
-                        bodySb.AppendLine($"> ⚠️ *(Ushbu rasm `{relativeImgPath}` manzilida saqlandi. OCR jarayonida xatolik yuz berdi: {ex.Message})*");
+                        bodySb.AppendLine($"> ⚠️ *(Ushbu rasm `{relativeImgPath}` manzilida saqlandi. OCR xatosi: {ex.Message})*");
                     }
                 }
                 else
@@ -199,33 +198,20 @@ public class PdfConverter
             }
         }
 
-        return FormatObsidianDocument(fileName, totalPages, bodySb.ToString());
+        return FormatDocument(fileName, totalPages, bodySb.ToString());
     }
 
-    private static string FormatObsidianDocument(string fileName, int totalPages, string bodyContent)
+    private static string FormatDocument(string fileName, int totalPages, string bodyContent)
     {
         var sb = new StringBuilder();
         var cleanTitle = Path.GetFileNameWithoutExtension(fileName);
 
-        // Clean Obsidian Header
         sb.AppendLine($"# 📄 {cleanTitle}");
         sb.AppendLine();
         sb.AppendLine($"> 📌 **Hujjat:** `{fileName}` | **Sahifalar:** {totalPages} ta | **Format:** PDF");
         sb.AppendLine();
-
-        // Table of Contents (Mundarija) with Obsidian anchor links
-        if (totalPages > 1)
-        {
-            sb.AppendLine("## 📑 Mundarija");
-            for (var i = 1; i <= totalPages; i++)
-            {
-                sb.AppendLine($"- [[#Sahifa {i}|Sahifa {i}]]");
-            }
-            sb.AppendLine();
-            sb.AppendLine("---");
-            sb.AppendLine();
-        }
-
+        sb.AppendLine("---");
+        sb.AppendLine();
         sb.AppendLine(bodyContent.Trim());
         return sb.ToString().Trim();
     }

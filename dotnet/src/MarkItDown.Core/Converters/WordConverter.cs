@@ -24,7 +24,6 @@ public class WordConverter
         CancellationToken ct = default)
     {
         var sb = new StringBuilder();
-        var tocList = new List<string>();
         var cleanDocName = Path.GetFileNameWithoutExtension(fileName).Replace(" ", "_");
         var attachmentFolder = $"{cleanDocName}_attachments";
         var fullAttachmentPath = !string.IsNullOrEmpty(outputDirectory)
@@ -98,12 +97,10 @@ public class WordConverter
                 if (style.StartsWith("Heading1", StringComparison.OrdinalIgnoreCase))
                 {
                     bodySb.AppendLine($"# {text}\n");
-                    tocList.Add(text);
                 }
                 else if (style.StartsWith("Heading2", StringComparison.OrdinalIgnoreCase))
                 {
                     bodySb.AppendLine($"## {text}\n");
-                    tocList.Add(text);
                 }
                 else if (style.StartsWith("Heading3", StringComparison.OrdinalIgnoreCase))
                 {
@@ -130,24 +127,13 @@ public class WordConverter
             }
         }
 
-        // Build Obsidian Output
+        // Clean Output without Mundarija
         sb.AppendLine($"# 📄 {Path.GetFileNameWithoutExtension(fileName)}");
         sb.AppendLine();
         sb.AppendLine($"> 📌 **Hujjat:** `{fileName}` | **Format:** Word (.docx)");
         sb.AppendLine();
-
-        if (tocList.Count > 0)
-        {
-            sb.AppendLine("## 📑 Mundarija");
-            foreach (var h in tocList)
-            {
-                sb.AppendLine($"- [[#{h}|{h}]]");
-            }
-            sb.AppendLine();
-            sb.AppendLine("---");
-            sb.AppendLine();
-        }
-
+        sb.AppendLine("---");
+        sb.AppendLine();
         sb.AppendLine(bodySb.ToString().Trim());
         return sb.ToString().Trim();
     }

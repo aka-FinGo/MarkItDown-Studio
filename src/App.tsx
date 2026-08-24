@@ -7,29 +7,24 @@ import React, { useState, useEffect } from "react";
 import {
   UploadCloud,
   Globe,
-  Code,
-  FileCheck2,
   AlertCircle,
   Loader2,
-  Sparkles,
 } from "lucide-react";
 import { Header } from "./components/Header";
 import { DropZone } from "./components/DropZone";
 import { UrlConverter } from "./components/UrlConverter";
-import { TextConverter } from "./components/TextConverter";
 import { MarkdownViewer } from "./components/MarkdownViewer";
 import { ApiDocsModal } from "./components/ApiDocsModal";
 import { SupportedFormatsModal } from "./components/SupportedFormatsModal";
 import { ApiKeyModal } from "./components/ApiKeyModal";
-import { GoogleAuthModal } from "./components/GoogleAuthModal";
-import { ConvertedItem, ConversionOptions, UserProfile, ThemeType } from "./types";
+import { ConvertedItem, ConversionOptions, ThemeType } from "./types";
 import {
   convertFileClient,
   convertUrlClient,
 } from "./services/converterService";
 
 export default function App() {
-  const [activeTab, setActiveTab] = useState<"upload" | "url" | "text">("upload");
+  const [activeTab, setActiveTab] = useState<"upload" | "url">("upload");
   const [options, setOptions] = useState<ConversionOptions>({
     enableAi: true,
     includeFrontmatter: false,
@@ -38,7 +33,6 @@ export default function App() {
   });
 
   const [theme, setTheme] = useState<ThemeType>("MidnightGlass");
-  const [user, setUser] = useState<UserProfile | null>(null);
   const [aiProvider, setAiProvider] = useState<string>("GoogleGemini");
   const [aiModel, setAiModel] = useState<string>("gemini-2.5-flash");
   const [apiKey, setApiKey] = useState<string>("");
@@ -54,17 +48,11 @@ export default function App() {
   const [isApiDocsOpen, setIsApiDocsOpen] = useState(false);
   const [isFormatsOpen, setIsFormatsOpen] = useState(false);
   const [isApiKeyModalOpen, setIsApiKeyModalOpen] = useState(false);
-  const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
 
   // Load saved state from localStorage
   useEffect(() => {
     const savedTheme = localStorage.getItem("markitdown_theme") as ThemeType;
     if (savedTheme) setTheme(savedTheme);
-
-    const savedUser = localStorage.getItem("markitdown_google_user");
-    if (savedUser) {
-      try { setUser(JSON.parse(savedUser)); } catch {}
-    }
 
     const savedProvider = localStorage.getItem("markitdown_ai_provider");
     if (savedProvider) setAiProvider(savedProvider);
@@ -116,16 +104,6 @@ export default function App() {
     } else {
       localStorage.removeItem(`markitdown_api_key_${provider}`);
     }
-  };
-
-  const handleLogin = (newUser: UserProfile) => {
-    setUser(newUser);
-    localStorage.setItem("markitdown_google_user", JSON.stringify(newUser));
-  };
-
-  const handleLogout = () => {
-    setUser(null);
-    localStorage.removeItem("markitdown_google_user");
   };
 
   const handleFilesSelected = (newFiles: File[]) => {
@@ -222,21 +200,19 @@ export default function App() {
     <div
       className={`min-h-screen flex flex-col font-sans transition-colors duration-200 ${
         theme === "ObsidianDark"
-          ? "bg-zinc-950 text-zinc-100"
+          ? "bg-[#181818] text-zinc-100"
           : theme === "CyberpunkNeon"
           ? "bg-[#050811] text-cyan-50"
           : theme === "FrostedCrystal"
-          ? "bg-slate-50 text-slate-900"
-          : "bg-slate-900 text-slate-100"
+          ? "bg-slate-100 text-slate-900"
+          : "bg-slate-950 text-slate-100"
       }`}
     >
       <Header
         onOpenApiDocs={() => setIsApiDocsOpen(true)}
         onOpenFormats={() => setIsFormatsOpen(true)}
         onOpenApiKey={() => setIsApiKeyModalOpen(true)}
-        onOpenAuth={() => setIsAuthModalOpen(true)}
         hasApiKey={Boolean(apiKey && apiKey.trim().length > 0)}
-        user={user}
         theme={theme}
         onThemeChange={handleThemeChange}
       />
@@ -263,7 +239,7 @@ export default function App() {
           {/* LEFT COLUMN: Input / Controls */}
           <div className="lg:col-span-5 space-y-4 flex flex-col">
             {/* Tabs */}
-            <div className="flex rounded-xl bg-zinc-800/80 p-1 border border-zinc-700/60 shadow-xs">
+            <div className="flex rounded-xl bg-zinc-900/80 p-1 border border-zinc-800 shadow-xs">
               <button
                 onClick={() => setActiveTab("upload")}
                 className={`flex-1 flex items-center justify-center gap-2 py-2 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
@@ -368,13 +344,6 @@ export default function App() {
         currentKey={apiKey}
         currentProvider={aiProvider}
         currentModel={aiModel}
-      />
-      <GoogleAuthModal
-        isOpen={isAuthModalOpen}
-        onClose={() => setIsAuthModalOpen(false)}
-        user={user}
-        onLogin={handleLogin}
-        onLogout={handleLogout}
       />
     </div>
   );
