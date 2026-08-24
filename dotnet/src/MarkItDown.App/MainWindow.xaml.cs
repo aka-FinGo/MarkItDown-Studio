@@ -63,17 +63,8 @@ public partial class MainWindow : Window
 
         // 4. API Key
         var savedKey = _config.GetApiKey(_config.SelectedProvider);
-        if (!string.IsNullOrEmpty(savedKey))
-        {
-            TxtApiKey.Password = savedKey;
-            TxtKeyStatus.Text = "🔒 Kalit saqlangan";
-            TxtKeyStatus.Foreground = new SolidColorBrush(Color.FromRgb(16, 185, 129));
-        }
-        else
-        {
-            TxtKeyStatus.Text = "⚠️ Kalit kiritilmagan";
-            TxtKeyStatus.Foreground = new SolidColorBrush(Color.FromRgb(245, 158, 11));
-        }
+        TxtApiKey.Password = savedKey;
+        UpdateKeyStatusAndGuide(_config.SelectedProvider, savedKey);
 
         // 5. Custom URL & AI switch
         TxtCustomBaseUrl.Text = _config.CustomBaseUrl ?? "http://localhost:11434";
@@ -84,30 +75,22 @@ public partial class MainWindow : Window
     {
         var welcomeMd = @"# 📄 MarkItDown Studio .NET ga Xush Kelibsiz! 🚀
 
-> 📌 **Hujjat:** `Namuna_Qollanma.md` | **Tizim:** Obsidian & Multi-AI Moslashuvchan Dvigatel
-
-## 📑 Mundarija
-- [[#1. Imkoniyatlar|1. Imkoniyatlar]]
-- [[#2. Obsidian Mosligi|2. Obsidian Mosligi]]
-- [[#3. Rasmlarni Boshqarish|3. Rasmlarni Boshqarish]]
-- [[#4. AI Provayderlar|4. AI Provayderlar]]
-
----
+> 📌 **Hujjat:** `Namuna_Qollanma.md` | **Tizim:** Multi-AI Smart Fallback Dvigatel
 
 ## 1. Imkoniyatlar
 - **PDF, Word (.docx), Excel (.xlsx), PowerPoint (.pptx), CSV, JSON, HTML, Kod va ZIP** fayllarni 100% toza matnga o'girish.
 - Hech qanday ortiqcha axlat matnlarsiz, hujjatdagi asl tartib saqlanadi.
 
-## 2. Obsidian Mosligi
-- Hujjatlar Obsidian da ochilganda avtomatik Mundarija linklari (`[[#Sahifa 1]]`), chiroyli callout bloklari (`> [!NOTE]`) va jadvallar bilan ko'rinadi.
+## 2. Universal AI Provayderlar & Modellar
+- **Google Gemini:** `gemini-2.5-flash`, `gemini-2.5-pro`, `gemini-3.7-flash`, `gemini-3-flash`, `gemini-3-pro`, `gemini-3-deep-think`
+- **Groq AI (Ultra-Tez 500+ tok/s):** `llama-3.3-70b-versatile`, `llama-3.1-8b-instant`, `deepseek-r1-distill-llama-70b`
+- **OpenAI:** `gpt-4o`, `gpt-4o-mini`, `o3-mini`, `o1`
+- **Anthropic Claude:** `claude-3-7-sonnet`, `claude-3-5-sonnet`, `claude-3-5-haiku`
+- **DeepSeek:** `deepseek-chat` (V3), `deepseek-reasoner` (R1)
+- **Ollama:** `llama3.2-vision`, `llava`, `qwen2.5-vl`
 
-## 3. Rasmlarni Boshqarish
-- Hujjat ichidagi barcha tasvirlar avtomatik alohida `{hujjat_nomi}_attachments/` papkasiga saqlanadi.
-- Agar API kalit ulangan bo'lsa, har bir rasm sun'iy intellekt orqali to'liq matnga o'girilib kiritiladi!
-
-## 4. AI Provayderlar
-- **Google Gemini**, **OpenAI (GPT-4o)**, **Anthropic Claude**, **DeepSeek**, **Ollama (Lokal)** yoki **Custom Endpoint**!
-- Barcha API kalitlaringiz shaxsiy kompyuteringizda xavfsiz shifrlanib saqlanadi.
+## 3. Smart Fallback (Avtomatik o'tish)
+- Agar tanlangan modelning limiti (Rate Limit) tugasa yoki band bo'lsa, tizim avtomatik zaxira modelga o'tib, konvertatsiyani to'xtovsiz davom ettiradi!
 ";
         TxtMarkdownEditor.Text = welcomeMd;
     }
@@ -224,10 +207,9 @@ public partial class MainWindow : Window
                     : Visibility.Collapsed;
             }
 
-            // Restore saved API key for this provider
             var key = _config.GetApiKey(provider);
             TxtApiKey.Password = key;
-            UpdateKeyStatus(key);
+            UpdateKeyStatusAndGuide(provider, key);
 
             if (!_isInitializing)
             {
@@ -258,7 +240,7 @@ public partial class MainWindow : Window
         var key = TxtApiKey.Password?.Trim() ?? string.Empty;
         var provider = GetSelectedProvider();
         _config.SetApiKey(provider, key);
-        UpdateKeyStatus(key);
+        UpdateKeyStatusAndGuide(provider, key);
     }
 
     private void CmbModelName_LostFocus(object sender, RoutedEventArgs e)
@@ -282,17 +264,26 @@ public partial class MainWindow : Window
         _config.Save();
     }
 
-    private void UpdateKeyStatus(string key)
+    private void UpdateKeyStatusAndGuide(AiProvider provider, string key)
     {
         if (!string.IsNullOrEmpty(key))
         {
             TxtKeyStatus.Text = "🔒 Kalit saqlandi";
             TxtKeyStatus.Foreground = new SolidColorBrush(Color.FromRgb(16, 185, 129));
+            if (PnlKeyGuide != null) PnlKeyGuide.Visibility = Visibility.Collapsed;
         }
         else
         {
             TxtKeyStatus.Text = "⚠️ Kalit kiritilmagan";
             TxtKeyStatus.Foreground = new SolidColorBrush(Color.FromRgb(245, 158, 11));
+            if (PnlKeyGuide != null && TxtKeyGuide != null)
+            {
+                PnlKeyGuide.Visibility = Visibility.Visible;
+                if (AiProviderConfig.ProviderGuide.TryGetValue(provider, out var guide))
+                {
+                    TxtKeyGuide.Text = guide;
+                }
+            }
         }
     }
 
@@ -475,7 +466,7 @@ public partial class MainWindow : Window
         {
             FileName = defaultName,
             DefaultExt = ".md",
-            Filter = "Obsidian / Markdown Hujjati (*.md)|*.md|Matn Hujjati (*.txt)|*.txt|Barcha Fayllar (*.*)|*.*"
+            Filter = "Markdown Hujjati (*.md)|*.md|Matn Hujjati (*.txt)|*.txt|Barcha Fayllar (*.*)|*.*"
         };
 
         if (dlg.ShowDialog() == true)

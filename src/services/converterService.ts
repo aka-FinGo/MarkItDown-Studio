@@ -269,7 +269,7 @@ export function fileToBase64(file: Blob): Promise<string> {
   });
 }
 
-// 6. Gemini Multimodal AI Call
+// 6. Gemini Multimodal AI Call with Auto-Fallback
 export async function convertWithGeminiApi(
   base64Data: string,
   mimeType: string,
@@ -292,43 +292,106 @@ ${customPrompt ? `Maxsus talab: ${customPrompt}` : ""}`;
 
   const promptText = `Ushbu "${filename}" (${mimeType}) faylidagi barcha matnlarni to'liq ajratib olib, toza Markdown formatiga o'tkazib ber.`;
 
-  const response = await fetch(
-    `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${apiKey}`,
-    {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        system_instruction: { parts: [{ text: systemInstruction }] },
-        contents: [
-          {
-            parts: [
-              { inline_data: { mime_type: mimeType, data: base64Data } },
-              { text: promptText },
-            ],
-          },
-        ],
-        generationConfig: { temperature: 0.1 },
-      }),
+  const makeCall = async (model: string) => {
+    const response = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          system_instruction: { parts: [{ text: systemInstruction }] },
+          contents: [
+            {
+              parts: [
+                { inline_data: { mime_type: mimeType, data: base64Data } },
+                { text: promptText },
+              ],
+            },
+          ],
+          generationConfig: { temperature: 0.1 },
+        }),
+      }
+    );
+
+    const data = await response.json();
+    if (!response.ok || data.error) {
+      throw new Error(data.error?.message || "Gemini AI xizmatida xatolik yuz berdi.");
     }
-  );
+
+    let rawMd = data.candidates?.[0]?.content?.parts?.[0]?.text || "";
+    if (rawMd.startsWith("```markdown\n") && rawMd.endsWith("\n```")) {
+      rawMd = rawMd.slice(12, -4);
+    } else if (rawMd.startsWith("```md\n") && rawMd.endsWith("\n```")) {
+      rawMd = rawMd.slice(6, -4);
+    }
+
+    const tokenUsage = data.usageMetadata?.totalTokenCount || estimateTokens(rawMd);
+    return { markdown: rawMd.trim(), tokensConsumed: tokenUsage };
+  };
+
+  try {
+    return await makeCall(modelName);
+  } catch (err: any) {
+    // Smart Fallback
+    const fallbackModel = modelName === "gemini-2.5-pro" ? "gemini-2.5-flash" : "gemini-2.5-flash-lite";
+    console.warn(`[Fallback] ${modelName} xatosi. ${fallbackModel} modeliga o'tilmoqda...`);
+    return await makeCall(fallbackModel);
+  }
+}
+
+// 7. OpenAI / Groq / DeepSeek / Custom AI Call
+export async function convertWithOpenAiApi(
+  base64Data: string,
+  mimeType: string,
+  filename: string,
+  apiKey: string,
+  endpoint: string,
+  modelName: string = "llama-3.3-70b-versatile",
+  customPrompt?: string
+): Promise<{ markdown: string; tokensConsumed: number }> {
+  if (!apiKey) {
+    throw new Error("AI API kaliti kiritilmagan.");
+  }
+
+  const systemInstruction = `Siz universal fayl konvertatsiya tizimisiz. Tasvirdagi barcha matnlar va jadvallarni toza Markdown ko'rinishida yozib bering.`;
+  const dataUrl = `data:${mimeType};base64,${base64Data}`;
+
+  const response = await fetch(endpoint, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${apiKey}`,
+    },
+    body: JSON.stringify({
+      model: modelName,
+      messages: [
+        { role: "system", content: systemInstruction },
+        {
+          role: "user",
+          content: [
+            { type: "text", text: `Ushbu "${filename}" fayldagi barcha matnlarni (jumladan Krill va Lotin harflari: қ, ғ, ҳ, ў) toza Markdown formatida yozib ber.` },
+            { type: "image_url", image_url: { url: dataUrl } },
+          ],
+        },
+      ],
+      temperature: 0.1,
+    }),
+  });
 
   const data = await response.json();
   if (!response.ok || data.error) {
-    throw new Error(data.error?.message || "Gemini AI xizmatida xatolik yuz berdi.");
+    throw new Error(data.error?.message || "AI so'rovida xatolik.");
   }
 
-  let rawMd = data.candidates?.[0]?.content?.parts?.[0]?.text || "";
+  let rawMd = data.choices?.[0]?.message?.content || "";
   if (rawMd.startsWith("```markdown\n") && rawMd.endsWith("\n```")) {
     rawMd = rawMd.slice(12, -4);
-  } else if (rawMd.startsWith("```md\n") && rawMd.endsWith("\n```")) {
-    rawMd = rawMd.slice(6, -4);
   }
-
-  const tokenUsage = data.usageMetadata?.totalTokenCount || estimateTokens(rawMd);
+  const tokenUsage = data.usage?.total_tokens || estimateTokens(rawMd);
   return { markdown: rawMd.trim(), tokensConsumed: tokenUsage };
 }
 
-// 7. Main Browser File Conversion Dispatcher without Mundarija
+// 8. Main Browser File Conversion Dispatcher without Mundarija
 export async function convertFileClient(
   file: File,
   options: ConversionOptions = {},
@@ -359,7 +422,20 @@ export async function convertFileClient(
       engine = `${provider} (${modelName})`;
       const base64 = await fileToBase64(file);
       const effectiveMime = file.type || (isAudio ? `audio/${ext}` : `image/${ext}`);
-      const aiResult = await convertWithGeminiApi(base64, effectiveMime, file.name, apiKey!, modelName, options.customPrompt);
+
+      let aiResult: { markdown: string; tokensConsumed: number };
+      if (provider === "GoogleGemini") {
+        aiResult = await convertWithGeminiApi(base64, effectiveMime, file.name, apiKey!, modelName, options.customPrompt);
+      } else if (provider === "GroqAI") {
+        aiResult = await convertWithOpenAiApi(base64, effectiveMime, file.name, apiKey!, "https://api.groq.com/openai/v1/chat/completions", modelName, options.customPrompt);
+      } else if (provider === "DeepSeek") {
+        aiResult = await convertWithOpenAiApi(base64, effectiveMime, file.name, apiKey!, "https://api.deepseek.com/v1/chat/completions", modelName, options.customPrompt);
+      } else if (provider === "OpenAI") {
+        aiResult = await convertWithOpenAiApi(base64, effectiveMime, file.name, apiKey!, "https://api.openai.com/v1/chat/completions", modelName, options.customPrompt);
+      } else {
+        aiResult = await convertWithOpenAiApi(base64, effectiveMime, file.name, apiKey!, customBaseUrl || "http://localhost:11434/v1/chat/completions", modelName, options.customPrompt);
+      }
+
       tokensConsumed = aiResult.tokensConsumed;
 
       markdown = `# 📄 ${cleanTitle}\n\n> 📌 **${isAudio ? "Audio" : "Tasvir"}:** \`${file.name}\` | **Format:** ${ext.toUpperCase()}\n\n`;
@@ -381,11 +457,18 @@ export async function convertFileClient(
     if (isScannedPdf) {
       if (hasApiKey) {
         usedAi = true;
-        engine = `${provider} Vision AI`;
+        engine = `${provider} Vision AI (${modelName})`;
         const base64 = await fileToBase64(file);
-        const aiResult = await convertWithGeminiApi(base64, "application/pdf", file.name, apiKey!, modelName, options.customPrompt);
-        docBody = aiResult.markdown;
-        tokensConsumed = aiResult.tokensConsumed;
+
+        if (provider === "GoogleGemini") {
+          const aiResult = await convertWithGeminiApi(base64, "application/pdf", file.name, apiKey!, modelName, options.customPrompt);
+          docBody = aiResult.markdown;
+          tokensConsumed = aiResult.tokensConsumed;
+        } else {
+          const aiResult = await convertWithOpenAiApi(base64, "image/png", file.name, apiKey!, provider === "GroqAI" ? "https://api.groq.com/openai/v1/chat/completions" : "https://api.openai.com/v1/chat/completions", modelName, options.customPrompt);
+          docBody = aiResult.markdown;
+          tokensConsumed = aiResult.tokensConsumed;
+        }
       } else {
         for (const p of pages) {
           docBody += `## Sahifa ${p.pageNum}\n\n`;
@@ -473,7 +556,7 @@ export async function convertFileClient(
   ];
 }
 
-// 8. Convert URL via r.jina.ai
+// 9. Convert URL via r.jina.ai
 export async function convertUrlClient(
   url: string,
   options: ConversionOptions = {},
