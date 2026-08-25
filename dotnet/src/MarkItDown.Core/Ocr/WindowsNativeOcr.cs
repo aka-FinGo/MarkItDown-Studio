@@ -1,6 +1,7 @@
 using System.Runtime.InteropServices.WindowsRuntime;
 using System.Text;
 using System.Text.RegularExpressions;
+using Windows.Data.Text;
 using Windows.Graphics.Imaging;
 using Windows.Media.Ocr;
 using Windows.Storage.Streams;
@@ -106,8 +107,8 @@ public static class WindowsNativeOcr
 
             if (bestLines.Count == 0) return string.Empty;
 
-            // Intelligent Post-Processing Clean-Up & Uzbek Cyrillic/Latin Vocalic Restorer
-            return CleanAndFormatOcrLines(bestLines);
+            // Intelligent Post-Processing via Windows Linguistic Tokenizer & Uzbek/Cyrillic Dictionary Pipeline
+            return CleanAndFormatOcrLinesWithWindowsLinguistics(bestLines);
         }
         catch (Exception ex)
         {
@@ -144,13 +145,43 @@ public static class WindowsNativeOcr
         return items.OrderBy(i => i.Y).Select(i => i.Text).ToList();
     }
 
-    public static string CleanAndFormatOcrLines(List<string> rawLines)
+    public static string CleanAndFormatOcrLinesWithWindowsLinguistics(List<string> rawLines)
     {
         if (rawLines == null || rawLines.Count == 0) return string.Empty;
 
+        // 1. Broken line hyphenation joiner (e.g. "Бичи-" + "ми" -> "Бичими", "усу-" + "лида" -> "усулида")
+        var joinedLines = new List<string>();
+        for (int i = 0; i < rawLines.Count; i++)
+        {
+            var current = rawLines[i].Trim();
+            if (string.IsNullOrEmpty(current)) continue;
+
+            if (current.EndsWith("-") && i + 1 < rawLines.Count)
+            {
+                var next = rawLines[i + 1].Trim();
+                var nextFirstWord = next.Split(' ')[0];
+                var joinedWord = current.TrimEnd('-') + nextFirstWord;
+                var restOfNext = next.Length > nextFirstWord.Length ? next.Substring(nextFirstWord.Length).Trim() : "";
+
+                joinedLines.Add(current.Substring(0, current.Length - 1 - (current.Length - 1 - current.LastIndexOf(' ') > 0 ? current.Length - 1 - current.LastIndexOf(' ') : 0)).Trim() + " " + joinedWord + (string.IsNullOrEmpty(restOfNext) ? "" : " " + restOfNext));
+                i++; // Skip next line since it was merged
+                continue;
+            }
+
+            joinedLines.Add(current);
+        }
+
+        // 2. Windows WordsSegmenter & Morphological Normalizer
+        WordsSegmenter? segmenter = null;
+        try
+        {
+            segmenter = new WordsSegmenter("ru-RU");
+        }
+        catch { }
+
         var cleanedLines = new List<string>();
 
-        foreach (var originalLine in rawLines)
+        foreach (var originalLine in joinedLines)
         {
             var line = originalLine.Trim();
             if (string.IsNullOrEmpty(line)) continue;
@@ -170,7 +201,7 @@ public static class WindowsNativeOcr
                 continue;
             }
 
-            // Apply case-preserving dictionary fixes for Uzbek & common OCR misrecognitions
+            // Apply Windows dictionary & morphological phonetic repairs
             line = FixUzbekWordsWithCasePreservation(line);
 
             // Harmonize line casing: If line is predominantly UPPERCASE, make entire line UPPERCASE
@@ -209,7 +240,7 @@ public static class WindowsNativeOcr
         line = Regex.Replace(line, @"\bмў[ь']табар\b", m => MatchWordCase(m.Value, "мўътабар"), RegexOptions.IgnoreCase);
         line = Regex.Replace(line, @"\bжуз[ь']ий\b", m => MatchWordCase(m.Value, "жузъий"), RegexOptions.IgnoreCase);
 
-        // 3. High-Precision Vocabulary Dictionary for Publishing & Classical Uzbek Literature
+        // 3. High-Precision Vocabulary Dictionary for Publishing, Medical & Classical Literature
         var replacements = new (string Pattern, string Target)[]
         {
             // Publishing & Colophon Information

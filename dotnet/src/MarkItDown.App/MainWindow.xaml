@@ -267,7 +267,8 @@
                                     </Grid>
                                     <TextBox x:Name="TxtRawInputText" Style="{StaticResource GlassTextBox}"
                                              Height="190" TextWrapping="Wrap" AcceptsReturn="True" VerticalScrollBarVisibility="Auto"
-                                             Background="#030712" Foreground="#E2E8F0" Padding="10" FontSize="12" Margin="0,0,0,10" />
+                                             Background="#030712" Foreground="#E2E8F0" Padding="10" FontSize="12" Margin="0,0,0,10"
+                                             SpellCheck.IsEnabled="True" />
                                     <Button x:Name="BtnConvertRawText" Click="BtnConvertRawText_Click" Style="{StaticResource AccentButton}" Padding="14,10" FontSize="12" FontWeight="Bold" HorizontalAlignment="Stretch">
                                         <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
                                             <TextBlock Text="✨" FontSize="13" Margin="0,0,6,0" VerticalAlignment="Center" />
@@ -386,6 +387,7 @@
                                              VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Auto"
                                              CaretBrush="#818CF8" SelectionBrush="#4F46E5"
                                              TextChanged="TxtMarkdownEditor_TextChanged"
+                                             SpellCheck.IsEnabled="True"
                                              Visibility="Visible" />
 
                                     <!-- Plain Text Editor -->
@@ -396,6 +398,7 @@
                                              VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Auto"
                                              CaretBrush="#38BDF8" SelectionBrush="#0284C7"
                                              TextChanged="TxtPlainTextEditor_TextChanged"
+                                             SpellCheck.IsEnabled="True"
                                              Visibility="Collapsed" />
                                 </Grid>
                             </Border>
