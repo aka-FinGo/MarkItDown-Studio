@@ -129,19 +129,21 @@
                         <RowDefinition Height="*" />    <!-- Content Area (DropZone / URL / Queue) -->
                     </Grid.RowDefinitions>
 
-                    <!-- Top Tabs -->
+                    <!-- Top Tabs (1:1 with Web: Fayllar, Web URL, Matn / Bufer) -->
                     <Border Grid.Row="0" Background="#0C1322" BorderBrush="#1E293B" BorderThickness="1" CornerRadius="12" Padding="4" Margin="0,0,0,12">
                         <Grid>
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="*" />
                                 <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="*" />
                             </Grid.ColumnDefinitions>
-                            <Button x:Name="BtnTabUpload" Grid.Column="0" Click="BtnTabUpload_Click" Style="{StaticResource AccentButton}" Content="📁 Faylni bu yerga tashlang" Padding="10,8" FontSize="11" FontWeight="SemiBold" Margin="0,0,2,0" />
-                            <Button x:Name="BtnTabUrl" Grid.Column="1" Click="BtnTabUrl_Click" Style="{StaticResource GlassButton}" Content="🌐 Web URL" Padding="10,8" FontSize="11" Margin="2,0,0,0" />
+                            <Button x:Name="BtnTabUpload" Grid.Column="0" Click="BtnTabUpload_Click" Style="{StaticResource AccentButton}" Content="📁 Fayllar" Padding="6,8" FontSize="11" FontWeight="SemiBold" Margin="0,0,2,0" />
+                            <Button x:Name="BtnTabUrl" Grid.Column="1" Click="BtnTabUrl_Click" Style="{StaticResource GlassButton}" Content="🌐 Web URL" Padding="6,8" FontSize="11" Margin="2,0,2,0" />
+                            <Button x:Name="BtnTabRawText" Grid.Column="2" Click="BtnTabRawText_Click" Style="{StaticResource GlassButton}" Content="📝 Matn / Bufer" Padding="6,8" FontSize="11" Margin="2,0,0,0" />
                         </Grid>
                     </Border>
 
-                    <!-- Left Content Area (DropZone + Queue) -->
+                    <!-- Left Content Area (DropZone + Queue + URL + Raw Text) -->
                     <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
                         <StackPanel>
                             <!-- Mode 1: File Drop Zone -->
@@ -149,46 +151,46 @@
                                 <!-- Drop Box Area -->
                                 <Border x:Name="DropArea"
                                         Background="#0A101D" BorderBrush="#312E81" BorderThickness="2" CornerRadius="16"
-                                        Padding="24,20" Margin="0,0,0,12"
+                                        Padding="20,16" Margin="0,0,0,12"
                                         AllowDrop="True" Drop="DropArea_Drop" DragEnter="DropArea_DragEnter" DragLeave="DropArea_DragLeave"
                                         Cursor="Hand" MouseLeftButtonDown="BtnSelectFile_Click">
                                     <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
-                                        <Border x:Name="DropIconBadge" Width="52" Height="52" Background="#1E1B4B" CornerRadius="16" BorderBrush="#4338CA" BorderThickness="1" HorizontalAlignment="Center" Margin="0,0,0,10">
-                                            <TextBlock Text="☁" Foreground="#818CF8" FontSize="24" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                        <Border x:Name="DropIconBadge" Width="48" Height="48" Background="#1E1B4B" CornerRadius="14" BorderBrush="#4338CA" BorderThickness="1" HorizontalAlignment="Center" Margin="0,0,0,8">
+                                            <TextBlock Text="☁" Foreground="#818CF8" FontSize="22" HorizontalAlignment="Center" VerticalAlignment="Center" />
                                         </Border>
                                         <TextBlock TextAlignment="Center">
                                             <Run x:Name="TxtDropTitle1" Text="Faylni bu yerga tashlang yoki " Foreground="#FFFFFF" FontWeight="Bold" FontSize="13" />
                                             <Run x:Name="TxtDropTitle2" Text="Fayl Tanlash..." Foreground="#6366F1" TextDecorations="Underline" FontWeight="Bold" FontSize="13" />
                                         </TextBlock>
-                                        <TextBlock x:Name="TxtDropSubtitle" Text="PDF, Word, Excel, PPTX, Rasm (OCR), Audio, ZIP, Kod" Foreground="#64748B" FontSize="11" TextWrapping="Wrap" TextAlignment="Center" Margin="0,4,0,12" />
+                                        <TextBlock x:Name="TxtDropSubtitle" Text="PDF, Word, Excel, PPTX, Rasm (OCR), Audio, ZIP, Kod" Foreground="#64748B" FontSize="11" TextWrapping="Wrap" TextAlignment="Center" Margin="0,4,0,10" />
 
                                         <!-- Format Badges -->
                                         <WrapPanel HorizontalAlignment="Center" Margin="0,0,0,0">
-                                            <Border Background="#1E293B" CornerRadius="6" Padding="6,2" Margin="2">
+                                            <Border Background="#1E293B" CornerRadius="6" Padding="5,2" Margin="2">
                                                 <TextBlock Text="PDF" Foreground="#94A3B8" FontSize="9" FontWeight="SemiBold" />
                                             </Border>
-                                            <Border Background="#1E293B" CornerRadius="6" Padding="6,2" Margin="2">
+                                            <Border Background="#1E293B" CornerRadius="6" Padding="5,2" Margin="2">
                                                 <TextBlock Text="Word (.docx)" Foreground="#94A3B8" FontSize="9" FontWeight="SemiBold" />
                                             </Border>
-                                            <Border Background="#1E293B" CornerRadius="6" Padding="6,2" Margin="2">
+                                            <Border Background="#1E293B" CornerRadius="6" Padding="5,2" Margin="2">
                                                 <TextBlock Text="Excel (.xlsx)" Foreground="#94A3B8" FontSize="9" FontWeight="SemiBold" />
                                             </Border>
-                                            <Border Background="#1E293B" CornerRadius="6" Padding="6,2" Margin="2">
+                                            <Border Background="#1E293B" CornerRadius="6" Padding="5,2" Margin="2">
                                                 <TextBlock Text="PowerPoint" Foreground="#94A3B8" FontSize="9" FontWeight="SemiBold" />
                                             </Border>
-                                            <Border Background="#1E293B" CornerRadius="6" Padding="6,2" Margin="2">
+                                            <Border Background="#1E293B" CornerRadius="6" Padding="5,2" Margin="2">
                                                 <TextBlock Text="CSV/TSV" Foreground="#94A3B8" FontSize="9" FontWeight="SemiBold" />
                                             </Border>
-                                            <Border Background="#1E293B" CornerRadius="6" Padding="6,2" Margin="2">
+                                            <Border Background="#1E293B" CornerRadius="6" Padding="5,2" Margin="2">
                                                 <TextBlock Text="JSON" Foreground="#94A3B8" FontSize="9" FontWeight="SemiBold" />
                                             </Border>
-                                            <Border Background="#1E293B" CornerRadius="6" Padding="6,2" Margin="2">
+                                            <Border Background="#1E293B" CornerRadius="6" Padding="5,2" Margin="2">
                                                 <TextBlock Text="Rasmlar (OCR)" Foreground="#94A3B8" FontSize="9" FontWeight="SemiBold" />
                                             </Border>
-                                            <Border Background="#1E293B" CornerRadius="6" Padding="6,2" Margin="2">
+                                            <Border Background="#1E293B" CornerRadius="6" Padding="5,2" Margin="2">
                                                 <TextBlock Text="Audio Ovoz" Foreground="#94A3B8" FontSize="9" FontWeight="SemiBold" />
                                             </Border>
-                                            <Border Background="#1E293B" CornerRadius="6" Padding="6,2" Margin="2">
+                                            <Border Background="#1E293B" CornerRadius="6" Padding="5,2" Margin="2">
                                                 <TextBlock Text="ZIP" Foreground="#94A3B8" FontSize="9" FontWeight="SemiBold" />
                                             </Border>
                                         </WrapPanel>
@@ -196,19 +198,19 @@
                                 </Border>
 
                                 <!-- Selected Files Queue (1:1 with Web DropZone Queue) -->
-                                <Border x:Name="PnlSelectedFilesQueue" Background="#0A101D" BorderBrush="#1E293B" BorderThickness="1" CornerRadius="16" Padding="14" Visibility="Collapsed">
+                                <Border x:Name="PnlSelectedFilesQueue" Background="#0A101D" BorderBrush="#1E293B" BorderThickness="1" CornerRadius="16" Padding="12" Visibility="Collapsed">
                                     <StackPanel>
                                         <!-- Header Row: Count & Clear All -->
-                                        <Grid Margin="0,0,0,10">
+                                        <Grid Margin="0,0,0,8">
                                             <TextBlock x:Name="TxtQueueSummary" Text="Tanlangan (0) Jami: 0 B" Foreground="#FFFFFF" FontWeight="Bold" FontSize="12" VerticalAlignment="Center" />
                                             <Button Click="BtnClearSelectedQueue_Click" HorizontalAlignment="Right" Style="{StaticResource GlassButton}" Content="Barchasini Tozalash" Padding="8,2" FontSize="11" Foreground="#94A3B8" />
                                         </Grid>
 
                                         <!-- Selected Files List -->
-                                        <ListBox x:Name="LstSelectedFilesQueue" MaxHeight="180" Background="Transparent" BorderThickness="0" ScrollViewer.HorizontalScrollBarVisibility="Disabled" Margin="0,0,0,12">
+                                        <ListBox x:Name="LstSelectedFilesQueue" MaxHeight="220" MinHeight="80" Background="Transparent" BorderThickness="0" ScrollViewer.HorizontalScrollBarVisibility="Disabled" Margin="0,0,0,10">
                                             <ListBox.ItemTemplate>
                                                 <DataTemplate>
-                                                    <Border Background="#0F172A" BorderBrush="#1E293B" BorderThickness="1" CornerRadius="8" Padding="10,6" Margin="0,0,0,6">
+                                                    <Border Background="#0F172A" BorderBrush="#1E293B" BorderThickness="1" CornerRadius="8" Padding="8,5" Margin="0,0,0,4">
                                                         <Grid>
                                                             <Grid.ColumnDefinitions>
                                                                 <ColumnDefinition Width="Auto" />
@@ -216,14 +218,14 @@
                                                                 <ColumnDefinition Width="Auto" />
                                                             </Grid.ColumnDefinitions>
                                                             <!-- Format Icon Badge -->
-                                                            <TextBlock Grid.Column="0" Text="📄" FontSize="13" VerticalAlignment="Center" Margin="0,0,8,0" />
+                                                            <TextBlock Grid.Column="0" Text="📄" FontSize="12" VerticalAlignment="Center" Margin="0,0,6,0" />
                                                             <!-- File name & Size -->
                                                             <StackPanel Grid.Column="1" VerticalAlignment="Center">
-                                                                <TextBlock Text="{Binding FileName}" Foreground="#F8FAFC" FontSize="12" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
-                                                                <TextBlock Text="{Binding FileSizeText}" Foreground="#64748B" FontSize="10" />
+                                                                <TextBlock Text="{Binding FileName}" Foreground="#F8FAFC" FontSize="11" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
+                                                                <TextBlock Text="{Binding FileSizeText}" Foreground="#64748B" FontSize="9" />
                                                             </StackPanel>
                                                             <!-- Remove Button -->
-                                                            <Button Grid.Column="2" Tag="{Binding}" Click="BtnRemoveFromQueue_Click" Style="{StaticResource GlassButton}" Padding="6,2" ToolTip="O'chirish">
+                                                            <Button Grid.Column="2" Tag="{Binding}" Click="BtnRemoveFromQueue_Click" Style="{StaticResource GlassButton}" Padding="4,1" ToolTip="O'chirish">
                                                                 <TextBlock Text="✕" Foreground="#94A3B8" FontSize="10" />
                                                             </Button>
                                                         </Grid>
@@ -233,19 +235,15 @@
                                         </ListBox>
 
                                         <!-- Bottom Action Row: Ready Status & Big Convert Button -->
-                                        <Grid VerticalAlignment="Center">
-                                            <Grid.ColumnDefinitions>
-                                                <ColumnDefinition Width="*" />
-                                                <ColumnDefinition Width="Auto" />
-                                            </Grid.ColumnDefinitions>
-                                            <TextBlock x:Name="TxtQueueReadyStatus" Text="0 ta fayl .md formatiga o'tkazishga tayyor" Foreground="#64748B" FontSize="11" VerticalAlignment="Center" TextWrapping="Wrap" />
-                                            <Button x:Name="BtnStartConvertFiles" Grid.Column="1" Click="BtnStartConvertFiles_Click" Style="{StaticResource AccentButton}" Padding="16,10" FontSize="12" FontWeight="Bold">
-                                                <StackPanel Orientation="Horizontal">
+                                        <StackPanel>
+                                            <TextBlock x:Name="TxtQueueReadyStatus" Text="0 ta fayl .md formatiga o'tkazishga tayyor" Foreground="#64748B" FontSize="11" Margin="0,0,0,6" TextWrapping="Wrap" />
+                                            <Button x:Name="BtnStartConvertFiles" Click="BtnStartConvertFiles_Click" Style="{StaticResource AccentButton}" Padding="14,10" FontSize="12" FontWeight="Bold" HorizontalAlignment="Stretch">
+                                                <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
                                                     <TextBlock Text="✨" FontSize="13" Margin="0,0,6,0" VerticalAlignment="Center" />
                                                     <TextBlock Text="Matnni Markdown (.md) ga O'tkazish" VerticalAlignment="Center" />
                                                 </StackPanel>
                                             </Button>
-                                        </Grid>
+                                        </StackPanel>
                                     </StackPanel>
                                 </Border>
                             </StackPanel>
@@ -257,6 +255,25 @@
                                     <TextBox x:Name="TxtWebUrl" Style="{StaticResource GlassTextBox}" Margin="0,0,0,10"
                                              Text="https://uz.wikipedia.org/wiki/Markdown" Foreground="#F8FAFC" FontSize="12" />
                                     <Button x:Name="BtnConvertUrl" Click="BtnConvertUrl_Click" Style="{StaticResource AccentButton}" Content="🌐 URL ni Markdown ga Aylantirish" Padding="14,8" FontSize="12" FontWeight="Bold" HorizontalAlignment="Stretch" />
+                                </StackPanel>
+                            </Border>
+
+                            <!-- Mode 3: Raw Text / Clipboard Converter to Smart Obsidian Markdown -->
+                            <Border x:Name="PnlRawTextMode" Background="#0A101D" BorderBrush="#1E293B" BorderThickness="1" CornerRadius="16" Padding="14" Visibility="Collapsed">
+                                <StackPanel>
+                                    <Grid Margin="0,0,0,8">
+                                        <TextBlock Text="📝 Xom Matn yoki Konspekt:" Foreground="#94A3B8" FontSize="12" VerticalAlignment="Center" />
+                                        <Button x:Name="BtnPasteFromClipboard" Click="BtnPasteFromClipboard_Click" HorizontalAlignment="Right" Style="{StaticResource GlassButton}" Content="📋 Buferdan Qo'yish" Padding="8,2" FontSize="11" Foreground="#818CF8" />
+                                    </Grid>
+                                    <TextBox x:Name="TxtRawInputText" Style="{StaticResource GlassTextBox}"
+                                             Height="190" TextWrapping="Wrap" AcceptsReturn="True" VerticalScrollBarVisibility="Auto"
+                                             Background="#030712" Foreground="#E2E8F0" Padding="10" FontSize="12" Margin="0,0,0,10" />
+                                    <Button x:Name="BtnConvertRawText" Click="BtnConvertRawText_Click" Style="{StaticResource AccentButton}" Padding="14,10" FontSize="12" FontWeight="Bold" HorizontalAlignment="Stretch">
+                                        <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
+                                            <TextBlock Text="✨" FontSize="13" Margin="0,0,6,0" VerticalAlignment="Center" />
+                                            <TextBlock Text="Aqlli Obsidian Formatlash (.md)" VerticalAlignment="Center" />
+                                        </StackPanel>
+                                    </Button>
                                 </StackPanel>
                             </Border>
                         </StackPanel>

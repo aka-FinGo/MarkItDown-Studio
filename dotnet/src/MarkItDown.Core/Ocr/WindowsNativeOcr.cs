@@ -23,7 +23,7 @@ public static class WindowsNativeOcr
 
             var decoder = await BitmapDecoder.CreateAsync(stream);
 
-            // Upscale image if small to ensure maximum OCR accuracy (Windows OCR works best at 1600px+)
+            // Upscale image if needed to ensure maximum OCR sharpness
             var originalWidth = decoder.PixelWidth;
             var originalHeight = decoder.PixelHeight;
 
@@ -77,20 +77,21 @@ public static class WindowsNativeOcr
                 var result = await engine.RecognizeAsync(softwareBitmap);
                 if (result != null && result.Lines.Count > 0)
                 {
-                    var lines = new List<(double Y, double X, string Text)>();
+                    var rawItems = new List<(double Y, double X, double Width, string Text)>();
                     foreach (var line in result.Lines)
                     {
                         var text = line.Text.Trim();
                         if (string.IsNullOrEmpty(text)) continue;
 
-                        // Calculate vertical position from words
                         var y = line.Words.Count > 0 ? line.Words[0].BoundingRect.Y : 0;
                         var x = line.Words.Count > 0 ? line.Words[0].BoundingRect.X : 0;
-                        lines.Add((y, x, text));
+                        var w = line.Words.Count > 0 ? line.Words.Last().BoundingRect.X + line.Words.Last().BoundingRect.Width - x : 0;
+                        rawItems.Add((y, x, w, text));
                     }
 
-                    // Sort lines in top-to-bottom reading order
-                    var sortedLines = lines.OrderBy(l => l.Y).Select(l => l.Text).ToList();
+                    // Smart 2-Column Spatial Reading Order Detection
+                    var sortedLines = ProcessSpatialReadingOrder(rawItems, softwareBitmap.PixelWidth);
+
                     var rawText = string.Join("\n", sortedLines);
                     var cyrillicCharCount = rawText.Count(c => (c >= 'А' && c <= 'я') || c == 'Ё' || c == 'ё');
                     var score = sortedLines.Count * 15 + cyrillicCharCount * 2;
@@ -105,7 +106,7 @@ public static class WindowsNativeOcr
 
             if (bestLines.Count == 0) return string.Empty;
 
-            // Intelligent Post-Processing Clean-Up & Uzbek/Cyrillic Case Normalizer
+            // Intelligent Post-Processing Clean-Up & Uzbek Cyrillic/Latin Vocalic Restorer
             return CleanAndFormatOcrLines(bestLines);
         }
         catch (Exception ex)
@@ -113,6 +114,34 @@ public static class WindowsNativeOcr
             Console.WriteLine($"[WindowsNativeOcr] Xatolik: {ex.Message}");
             return string.Empty;
         }
+    }
+
+    private static List<string> ProcessSpatialReadingOrder(List<(double Y, double X, double Width, string Text)> items, int pageWidth)
+    {
+        if (items.Count <= 2) return items.OrderBy(i => i.Y).Select(i => i.Text).ToList();
+
+        // Check if there is a distinct 2-column layout (significant lines on left and right)
+        var midX = pageWidth / 2.0;
+        var leftLines = items.Where(i => i.X + i.Width * 0.5 < midX).ToList();
+        var rightLines = items.Where(i => i.X >= midX * 0.75).ToList();
+
+        // If both left and right columns have at least 25% of total items, sort left column first, then right column!
+        if (leftLines.Count >= items.Count * 0.25 && rightLines.Count >= items.Count * 0.25)
+        {
+            var headerLines = items.Where(i => i.Y < items.Min(x => x.Y) + 60 && i.Width > pageWidth * 0.6).OrderBy(i => i.Y).ToList();
+            var leftSorted = leftLines.Except(headerLines).OrderBy(i => i.Y).ToList();
+            var rightSorted = rightLines.Except(headerLines).OrderBy(i => i.Y).ToList();
+
+            var combined = new List<string>();
+            foreach (var h in headerLines) combined.Add(h.Text);
+            foreach (var l in leftSorted) combined.Add(l.Text);
+            foreach (var r in rightSorted) combined.Add(r.Text);
+
+            return combined;
+        }
+
+        // Standard single column top-to-bottom sorting
+        return items.OrderBy(i => i.Y).Select(i => i.Text).ToList();
     }
 
     public static string CleanAndFormatOcrLines(List<string> rawLines)
@@ -144,7 +173,7 @@ public static class WindowsNativeOcr
             // Apply case-preserving dictionary fixes for Uzbek & common OCR misrecognitions
             line = FixUzbekWordsWithCasePreservation(line);
 
-            // Harmonize line casing: If line is predominantly UPPERCASE (e.g. "АБДУЛЛА ҚОДИРИЙ", "ХАЛҚ МЕРОСИ"), make entire line UPPERCASE
+            // Harmonize line casing: If line is predominantly UPPERCASE, make entire line UPPERCASE
             line = HarmonizeLineCase(line);
 
             // Clean spaces around punctuation
@@ -160,18 +189,26 @@ public static class WindowsNativeOcr
 
     private static string FixUzbekWordsWithCasePreservation(string line)
     {
-        // Dictionary of words: Pattern -> Correct Uzbek spelling
+        // 1. Vocalic Glitch Normalization (e.g. "бУлса" -> "бўлса", "кУз" -> "кўз", "Упка" -> "ўпка")
+        line = Regex.Replace(line, @"\bбУл([а-я]+)?\b", m => MatchWordCase(m.Value, "бўл" + m.Groups[1].Value), RegexOptions.IgnoreCase);
+        line = Regex.Replace(line, @"\bкУз([а-я]+)?\b", m => MatchWordCase(m.Value, "кўз" + m.Groups[1].Value), RegexOptions.IgnoreCase);
+        line = Regex.Replace(line, @"\bУпк([а-я]+)?\b", m => MatchWordCase(m.Value, "ўпк" + m.Groups[1].Value), RegexOptions.IgnoreCase);
+        line = Regex.Replace(line, @"\bкУр([а-я]+)?\b", m => MatchWordCase(m.Value, "кўр" + m.Groups[1].Value), RegexOptions.IgnoreCase);
+        line = Regex.Replace(line, @"\bУрг([а-я]+)?\b", m => MatchWordCase(m.Value, "ўрг" + m.Groups[1].Value), RegexOptions.IgnoreCase);
+        line = Regex.Replace(line, @"\bУт([а-я]+)?\b", m => MatchWordCase(m.Value, "ўт" + m.Groups[1].Value), RegexOptions.IgnoreCase);
+        line = Regex.Replace(line, @"\bшабкУрлик\b", m => MatchWordCase(m.Value, "шабкўрлик"), RegexOptions.IgnoreCase);
+        line = Regex.Replace(line, @"\bкУкрак\b", m => MatchWordCase(m.Value, "кўкрак"), RegexOptions.IgnoreCase);
+
+        // 2. High-Precision Vocabulary Dictionary for Classical & Modern Uzbek Cyrillic OCR
         var replacements = new (string Pattern, string Target)[]
         {
-            // Title words
+            // Books, authors and publications
             (@"\bконуила?ри\b", "қонунлари"),
             (@"\bконунлари\b", "қонунлари"),
             (@"\bконуни\b", "қонуни"),
             (@"\bсайланма\b", "сайланма"),
             (@"\bжилдлик\b", "жилдлик"),
             (@"\bжилд\b", "жилд"),
-
-            // Names & Locations
             (@"\bабу\b", "абу"),
             (@"\bали\b", "али"),
             (@"\bибн\b", "ибн"),
@@ -181,15 +218,52 @@ public static class WindowsNativeOcr
             (@"\bтошкент\b", "тошкент"),
             (@"\bабдулла\b", "абдулла"),
             (@"\bкодирий\b", "қодирий"),
-            (@"\bкодирий,\b", "қодирий"),
             (@"\bномиддги\b", "номидаги"),
             (@"\bномидаги\b", "номидаги"),
             (@"\bхалк\b", "халқ"),
-            (@"\bхалк,\b", "халқ"),
             (@"\bмероси\b", "мероси"),
             (@"\bнашриёти\b", "нашриёти"),
+            (@"\bмунда\s*рижа\b", "МУНДАРИЖА"),
 
-            // State & Academic terms
+            // Medical & Scientific Terms (Ibn Sino Canon)
+            (@"\bлилинган\b", "қилинган"),
+            (@"\bкилинган\b", "қилинган"),
+            (@"\bлилади\b", "қилади"),
+            (@"\bкяилади\b", "қилади"),
+            (@"\bкилади\b", "қилади"),
+            (@"\bлувват(и)?\b", "қувват$1"),
+            (@"\bтарёк\b", "тарёқ"),
+            (@"\bтарёл\b", "тарёқ"),
+            (@"\bоррик\b", "оғриқ"),
+            (@"\bорриги\b", "оғриғи"),
+            (@"\bорриклар\b", "оғриқлар"),
+            (@"\bуруги\b", "уруғи"),
+            (@"\bларорат\b", "ҳарорат"),
+            (@"\bмелригиёл\b", "меҳригиёҳ"),
+            (@"\bажволини\b", "аҳволини"),
+            (@"\bлаттик\b", "қаттиқ"),
+            (@"\bиссиллик\b", "иссиқлик"),
+            (@"\bиссик\b", "иссиқ"),
+            (@"\bлукна\b", "ҳуқна"),
+            (@"\bхукна\b", "ҳуқна"),
+            (@"\bлуйиладиган\b", "қуйиладиган"),
+            (@"\bчорда\b", "чоғда"),
+            (@"\bсарил\b", "сариқ"),
+            (@"\bкалтирол\b", "қалтироқ"),
+            (@"\bтуррисида\b", "тўғрисида"),
+            (@"\bтугрисида\b", "тўғрисида"),
+            (@"\bяллигланиши\b", "яллиғланиши"),
+            (@"\bяллирланиши\b", "яллиғланиши"),
+            (@"\bсоглигини\b", "соғлиғини"),
+            (@"\bсорлигини\b", "соғлиғини"),
+            (@"\bжузъий\b", "жузъий"),
+            (@"\bаъзолар(да)?\b", "аъзолар$1"),
+            (@"\bмигрень\b", "мигрень"),
+            (@"\bзотурриа\b", "зотуррия"),
+            (@"\bзотуррия\b", "зотуррия"),
+            (@"\bларсиллаш\b", "ҳарсиллаш"),
+            (@"\bхарсиллаш\b", "ҳарсиллаш"),
+            (@"\bа\s*с\s*тм\s*а\b", "астма"),
             (@"\bузбекистон\b", "ўзбекистон"),
             (@"\bкулёзма\b", "қўлёзма"),
             (@"\bкисм\b", "қисм"),
@@ -223,25 +297,21 @@ public static class WindowsNativeOcr
         var letters = original.Where(char.IsLetter).ToList();
         if (letters.Count == 0) return target;
 
-        // If original is ALL UPPERCASE (e.g. "КОДИРИЙ", "ХАЛК", "УЧ", "ЖИЛД") -> "ҚОДИРИЙ", "ХАЛҚ"
         if (letters.All(char.IsUpper))
         {
             return target.ToUpperInvariant();
         }
 
-        // If original is TitleCase (e.g. "Кодирий", "Халк") -> "Қодирий", "Халқ"
         if (char.IsUpper(letters[0]) && letters.Skip(1).All(char.IsLower))
         {
             return char.ToUpper(target[0]) + (target.Length > 1 ? target.Substring(1).ToLowerInvariant() : "");
         }
 
-        // If original is all lowercase -> all lowercase
         if (letters.All(char.IsLower))
         {
             return target.ToLowerInvariant();
         }
 
-        // Mixed case OCR glitch (e.g. "конуилаРи") -> TitleCase if first is Upper, else lowercase
         if (char.IsUpper(original[0]))
         {
             return char.ToUpper(target[0]) + (target.Length > 1 ? target.Substring(1).ToLowerInvariant() : "");
@@ -257,8 +327,6 @@ public static class WindowsNativeOcr
 
         var upperWords = words.Count(w => w.All(char.IsUpper) && w.Length > 1);
 
-        // If 60%+ of the words in the line are ALL UPPERCASE (e.g. "АБДУЛЛА қодирий", "халқ МЕРОСИ", "уч ЖИЛДЛИК САЙЛАНМА")
-        // Make the entire line UPPERCASE for consistency!
         if ((double)upperWords / words.Count >= 0.5)
         {
             return line.ToUpperInvariant();

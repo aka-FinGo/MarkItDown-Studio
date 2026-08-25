@@ -1,5 +1,6 @@
 using System.Collections.ObjectModel;
 using System.IO;
+using System.Text;
 using System.Text.RegularExpressions;
 using System.Windows;
 using System.Windows.Controls;
@@ -39,6 +40,7 @@ public partial class MainWindow : Window
 
     public MainWindow()
     {
+        SetBrowserEmulationMode();
         InitializeComponent();
         _engine = new MarkItDownEngine();
         _aiClient = new UniversalAiClient();
@@ -532,21 +534,233 @@ public partial class MainWindow : Window
         }
     }
 
-    // Tabs
+    private static void SetBrowserEmulationMode()
+    {
+        try
+        {
+            var appName = System.IO.Path.GetFileName(System.Diagnostics.Process.GetCurrentProcess().MainModule?.FileName ?? "MarkItDownStudio.exe");
+            using var key = Microsoft.Win32.Registry.CurrentUser.CreateSubKey(@"Software\Microsoft\Internet Explorer\Main\FeatureControl\FEATURE_BROWSER_EMULATION");
+            key?.SetValue(appName, 11001, Microsoft.Win32.RegistryValueKind.DWord);
+            key?.SetValue("MarkItDown.App.exe", 11001, Microsoft.Win32.RegistryValueKind.DWord);
+            key?.SetValue("MarkItDownStudio.exe", 11001, Microsoft.Win32.RegistryValueKind.DWord);
+        }
+        catch { }
+    }
+
+    // Tabs (1:1 with Web: Fayllar, Web URL, Matn / Bufer)
     private void BtnTabUpload_Click(object sender, RoutedEventArgs e)
     {
         PnlUploadMode.Visibility = Visibility.Visible;
         PnlUrlMode.Visibility = Visibility.Collapsed;
+        PnlRawTextMode.Visibility = Visibility.Collapsed;
         BtnTabUpload.Style = (Style)FindResource("AccentButton");
         BtnTabUrl.Style = (Style)FindResource("GlassButton");
+        BtnTabRawText.Style = (Style)FindResource("GlassButton");
     }
 
     private void BtnTabUrl_Click(object sender, RoutedEventArgs e)
     {
         PnlUploadMode.Visibility = Visibility.Collapsed;
         PnlUrlMode.Visibility = Visibility.Visible;
+        PnlRawTextMode.Visibility = Visibility.Collapsed;
         BtnTabUpload.Style = (Style)FindResource("GlassButton");
         BtnTabUrl.Style = (Style)FindResource("AccentButton");
+        BtnTabRawText.Style = (Style)FindResource("GlassButton");
+    }
+
+    private void BtnTabRawText_Click(object sender, RoutedEventArgs e)
+    {
+        PnlUploadMode.Visibility = Visibility.Collapsed;
+        PnlUrlMode.Visibility = Visibility.Collapsed;
+        PnlRawTextMode.Visibility = Visibility.Visible;
+        BtnTabUpload.Style = (Style)FindResource("GlassButton");
+        BtnTabUrl.Style = (Style)FindResource("GlassButton");
+        BtnTabRawText.Style = (Style)FindResource("AccentButton");
+    }
+
+    private void BtnPasteFromClipboard_Click(object sender, RoutedEventArgs e)
+    {
+        try
+        {
+            if (Clipboard.ContainsText())
+            {
+                TxtRawInputText.Text = Clipboard.GetText();
+            }
+            else
+            {
+                MessageBox.Show("Buferda (Clipboard) matn topilmadi.", "Xabar", MessageBoxButton.OK, MessageBoxImage.Information);
+            }
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show($"Buferdan olishda xatolik: {ex.Message}", "Xatolik", MessageBoxButton.OK, MessageBoxImage.Warning);
+        }
+    }
+
+    private async void BtnConvertRawText_Click(object sender, RoutedEventArgs e)
+    {
+        var rawText = TxtRawInputText?.Text?.Trim();
+        if (string.IsNullOrEmpty(rawText))
+        {
+            MessageBox.Show("Iltimos, avval formatlamoqchi bo'lgan matnni yozing yoki buferdan qo'ying.", "Xabar", MessageBoxButton.OK, MessageBoxImage.Information);
+            return;
+        }
+
+        var sw = System.Diagnostics.Stopwatch.StartNew();
+        var aiConfig = GetCurrentAiConfig();
+        var isAiEnabled = (ChkEnableAi?.IsChecked == true);
+
+        string finalMarkdown;
+        string engineName;
+        var usedAi = false;
+        var tokensConsumed = 0;
+
+        if (isAiEnabled && !string.IsNullOrWhiteSpace(aiConfig.ApiKey))
+        {
+            try
+            {
+                var prompt = @"Ushbu xom matnni (konspekt, kitob sahifasi, ma'ruza yoki qaydlar) Obsidian uchun to'liq boyitilgan, toza va mukammal Markdown formatiga o'tkazib ber.
+Tegishli # Sarlavhalar, ## Kichik sarlavhalar, - Ro'yxatlar, |---| Jadvallar, > [!NOTE] iqtiboslar, **qalin** va *kursiv* urg'ular qo'sh. Ortiqcha so'z yoki tushuntirish qo'shma, faqat tayyor toza Markdown matnini qaytar.";
+
+                var rawBytes = Encoding.UTF8.GetBytes(rawText);
+                var aiRes = await _aiClient.ConvertWithAiAsync(rawBytes, "text/plain", "Raw_Notes.txt", aiConfig, prompt);
+                finalMarkdown = aiRes.Markdown;
+                tokensConsumed = aiRes.TokensConsumed;
+                usedAi = true;
+                engineName = $"{aiConfig.Provider} ({aiConfig.ModelName})";
+            }
+            catch
+            {
+                finalMarkdown = FormatRawTextToObsidianMarkdown(rawText);
+                engineName = "Lokal Aqlli Obsidian Formatlagich";
+            }
+        }
+        else
+        {
+            finalMarkdown = FormatRawTextToObsidianMarkdown(rawText);
+            engineName = "Lokal Aqlli Obsidian Formatlagich";
+        }
+
+        sw.Stop();
+
+        var title = ExtractTitle(rawText);
+        var res = new ConversionResult
+        {
+            FileName = $"{title}.md",
+            OriginalFormat = "Matn / Bufer",
+            OriginalSizeBytes = Encoding.UTF8.GetByteCount(rawText),
+            Markdown = finalMarkdown,
+            WordCount = CountWords(finalMarkdown),
+            CharCount = finalMarkdown.Length,
+            LineCount = finalMarkdown.Split('\n').Length,
+            EstimatedTokens = (int)Math.Ceiling(finalMarkdown.Length / 3.8),
+            DurationMs = sw.ElapsedMilliseconds,
+            UsedAi = usedAi,
+            TokensConsumed = tokensConsumed,
+            EngineName = engineName,
+            IsSuccess = true
+        };
+
+        ConvertedItems.Insert(0, res);
+        SetActiveResult(res);
+
+        // Switch to Obsidian Preview
+        BtnViewObsidian_Click(this, new RoutedEventArgs());
+    }
+
+    public static string FormatRawTextToObsidianMarkdown(string rawText)
+    {
+        if (string.IsNullOrWhiteSpace(rawText)) return string.Empty;
+
+        var lines = rawText.Split(new[] { "\r\n", "\r", "\n" }, StringSplitOptions.None);
+        var sb = new StringBuilder();
+
+        var title = ExtractTitle(rawText);
+        sb.AppendLine($"# 📄 {title}");
+        sb.AppendLine();
+        sb.AppendLine($"> 📌 **Format:** Obsidian Markdown | **Vaqt:** {DateTime.Now:yyyy-MM-dd HH:mm}");
+        sb.AppendLine();
+        sb.AppendLine("---");
+        sb.AppendLine();
+
+        var inTable = false;
+
+        foreach (var rawLine in lines)
+        {
+            var line = rawLine.Trim();
+            if (string.IsNullOrEmpty(line))
+            {
+                if (inTable) inTable = false;
+                sb.AppendLine();
+                continue;
+            }
+
+            // Headings detection (ALL CAPS or short titles or numbers like "МУНДАРИЖА", "1. БОБ")
+            if (Regex.IsMatch(line, @"^(МУНДАРИЖА|ТАДБИР|МУҚАДДИМА|ХОТИМА|БОБ\s*\d+|ФАСЛ\s*\d+|[\dIVXLCDM]+\.\s*[A-ZА-ЯЁҚҒҲЎ])", RegexOptions.IgnoreCase) ||
+                (line.Length < 60 && line == line.ToUpperInvariant() && line.Count(char.IsLetter) > 3))
+            {
+                if (inTable) inTable = false;
+                sb.AppendLine();
+                sb.AppendLine($"## 📌 {line}");
+                sb.AppendLine();
+                continue;
+            }
+
+            // Dotted or numbered table of contents / index lines (e.g. "Title . . . 14" or "Title 14")
+            var tocMatch = Regex.Match(line, @"^(.*?)(?:\.{2,}|\s{3,})(\d+)$");
+            if (tocMatch.Success)
+            {
+                var itemTitle = tocMatch.Groups[1].Value.Trim().TrimEnd('.', '-');
+                var pageNum = tocMatch.Groups[2].Value.Trim();
+                sb.AppendLine($"- **{itemTitle}** `[Sahifa: {pageNum}]`");
+                continue;
+            }
+
+            // Bullet lists detection
+            if (Regex.IsMatch(line, @"^[\d]+[\.\)]\s+"))
+            {
+                sb.AppendLine(line);
+                continue;
+            }
+            if (Regex.IsMatch(line, @"^[-*•]\s+"))
+            {
+                sb.AppendLine($"- {line.Substring(1).Trim()}");
+                continue;
+            }
+
+            // Important medical/rule alerts detection
+            if (Regex.IsMatch(line, @"^(эслатма|диққат|муҳим|қоида|note|important):", RegexOptions.IgnoreCase))
+            {
+                sb.AppendLine();
+                sb.AppendLine("> [!IMPORTANT]");
+                sb.AppendLine($"> **{line}**");
+                sb.AppendLine();
+                continue;
+            }
+
+            // Default paragraph line
+            sb.AppendLine(line);
+        }
+
+        return sb.ToString().Trim();
+    }
+
+    private static string ExtractTitle(string text)
+    {
+        var firstLine = text.Split('\n').Select(l => l.Trim()).FirstOrDefault(l => !string.IsNullOrEmpty(l));
+        if (!string.IsNullOrEmpty(firstLine))
+        {
+            var clean = Regex.Replace(firstLine, @"[^\w\s-]", "").Trim();
+            if (clean.Length > 30) clean = clean.Substring(0, 30);
+            if (!string.IsNullOrEmpty(clean)) return clean;
+        }
+        return $"Hujjat_{DateTime.Now:yyyyMMdd_HHmmss}";
+    }
+
+    private static int CountWords(string text)
+    {
+        if (string.IsNullOrWhiteSpace(text)) return 0;
+        return text.Split(new[] { ' ', '\r', '\n', '\t' }, StringSplitOptions.RemoveEmptyEntries).Length;
     }
 
     // ==========================================
@@ -1030,18 +1244,9 @@ public partial class MainWindow : Window
 
         if (TxtMarkdownEditor != null) TxtMarkdownEditor.Text = result.Markdown;
         if (TxtPlainTextEditor != null) TxtPlainTextEditor.Text = StripMarkdownToPlainText(result.Markdown);
+        if (TxtPlainTextPreview != null) TxtPlainTextPreview.Text = StripMarkdownToPlainText(result.Markdown);
 
-        if (_currentViewMode == "Preview" || _currentViewMode == "Split")
-        {
-            if (_currentContentType == "PlainText")
-            {
-                if (TxtPlainTextPreview != null) TxtPlainTextPreview.Text = StripMarkdownToPlainText(result.Markdown);
-            }
-            else
-            {
-                UpdatePreviewHtml(result.Markdown);
-            }
-        }
+        UpdatePreviewHtml(result.Markdown);
     }
 
     private void LstConvertedItems_SelectionChanged(object sender, SelectionChangedEventArgs e)
