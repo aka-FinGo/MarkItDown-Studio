@@ -23,14 +23,14 @@ public static class WindowsNativeOcr
 
             var decoder = await BitmapDecoder.CreateAsync(stream);
 
-            // Upscale image if small to ensure maximum OCR accuracy (Windows OCR works best at 1500px+)
+            // Upscale image if small to ensure maximum OCR accuracy (Windows OCR works best at 1600px+)
             var originalWidth = decoder.PixelWidth;
             var originalHeight = decoder.PixelHeight;
 
             var transform = new BitmapTransform();
-            if (originalWidth < 1200 || originalHeight < 1200)
+            if (originalWidth < 1400 || originalHeight < 1400)
             {
-                var scale = Math.Max(2.0, 1600.0 / Math.Max(originalWidth, originalHeight));
+                var scale = Math.Max(2.0, 1800.0 / Math.Max(originalWidth, originalHeight));
                 transform.ScaledWidth = (uint)(originalWidth * scale);
                 transform.ScaledHeight = (uint)(originalHeight * scale);
                 transform.InterpolationMode = BitmapInterpolationMode.Fant;
@@ -43,39 +43,33 @@ public static class WindowsNativeOcr
                 ExifOrientationMode.RespectExifOrientation,
                 ColorManagementMode.ColorManageToSRgb);
 
-            // 1. Find best engines: Russian (for Cyrillic) and English (for Latin)
+            // Find best engines: Russian (for Cyrillic) and English (for Latin)
             var available = OcrEngine.AvailableRecognizerLanguages;
             var ruLang = available.FirstOrDefault(l => l.LanguageTag.StartsWith("ru", StringComparison.OrdinalIgnoreCase)
                                                     || l.LanguageTag.StartsWith("uz-Cyrl", StringComparison.OrdinalIgnoreCase));
             var enLang = available.FirstOrDefault(l => l.LanguageTag.StartsWith("en", StringComparison.OrdinalIgnoreCase)
                                                     || l.LanguageTag.StartsWith("uz-Latn", StringComparison.OrdinalIgnoreCase));
 
-            // Try Russian engine first (Cyrillic support), fallback to English, then any available
             var enginesToTry = new List<OcrEngine>();
-
             if (ruLang != null)
             {
                 var engRu = OcrEngine.TryCreateFromLanguage(ruLang);
                 if (engRu != null) enginesToTry.Add(engRu);
             }
-
             if (enLang != null)
             {
                 var engEn = OcrEngine.TryCreateFromLanguage(enLang);
                 if (engEn != null) enginesToTry.Add(engEn);
             }
-
-            if (enginesToTry.Count == 0)
+            if (enginesToTry.Count == 0 && available.Count > 0)
             {
-                var defaultEngine = OcrEngine.TryCreateFromUserProfileLanguages()
-                                  ?? (available.Count > 0 ? OcrEngine.TryCreateFromLanguage(available[0]) : null);
+                var defaultEngine = OcrEngine.TryCreateFromLanguage(available[0]);
                 if (defaultEngine != null) enginesToTry.Add(defaultEngine);
             }
 
             if (enginesToTry.Count == 0) return string.Empty;
 
-            // Run OCR with primary engine
-            var bestText = string.Empty;
+            var bestLines = new List<string>();
             var bestScore = -1;
 
             foreach (var engine in enginesToTry)
@@ -83,29 +77,36 @@ public static class WindowsNativeOcr
                 var result = await engine.RecognizeAsync(softwareBitmap);
                 if (result != null && result.Lines.Count > 0)
                 {
-                    var lines = new List<string>();
+                    var lines = new List<(double Y, double X, string Text)>();
                     foreach (var line in result.Lines)
                     {
-                        var t = line.Text.Trim();
-                        if (!string.IsNullOrEmpty(t)) lines.Add(t);
+                        var text = line.Text.Trim();
+                        if (string.IsNullOrEmpty(text)) continue;
+
+                        // Calculate vertical position from words
+                        var y = line.Words.Count > 0 ? line.Words[0].BoundingRect.Y : 0;
+                        var x = line.Words.Count > 0 ? line.Words[0].BoundingRect.X : 0;
+                        lines.Add((y, x, text));
                     }
 
-                    var rawText = string.Join("\n", lines);
+                    // Sort lines in top-to-bottom reading order
+                    var sortedLines = lines.OrderBy(l => l.Y).Select(l => l.Text).ToList();
+                    var rawText = string.Join("\n", sortedLines);
                     var cyrillicCharCount = rawText.Count(c => (c >= 'А' && c <= 'я') || c == 'Ё' || c == 'ё');
-                    var score = lines.Count * 10 + cyrillicCharCount;
+                    var score = sortedLines.Count * 15 + cyrillicCharCount * 2;
 
                     if (score > bestScore)
                     {
                         bestScore = score;
-                        bestText = rawText;
+                        bestLines = sortedLines;
                     }
                 }
             }
 
-            if (string.IsNullOrWhiteSpace(bestText)) return string.Empty;
+            if (bestLines.Count == 0) return string.Empty;
 
-            // 2. Intelligent Post-Processing Clean-Up & Uzbek/Cyrillic Normalizer
-            return CleanAndFormatOcrText(bestText);
+            // Intelligent Post-Processing Clean-Up & Uzbek/Cyrillic Case Normalizer
+            return CleanAndFormatOcrLines(bestLines);
         }
         catch (Exception ex)
         {
@@ -114,33 +115,39 @@ public static class WindowsNativeOcr
         }
     }
 
-    /// <summary>
-    /// Intelligently cleans OCR output, fixes mixed-case glitches, removes OCR artifacts,
-    /// and normalizes Uzbek Cyrillic/Latin characters (қ, ғ, ҳ, ў, о', g').
-    /// </summary>
-    public static string CleanAndFormatOcrText(string rawText)
+    public static string CleanAndFormatOcrLines(List<string> rawLines)
     {
-        if (string.IsNullOrWhiteSpace(rawText)) return string.Empty;
+        if (rawLines == null || rawLines.Count == 0) return string.Empty;
 
-        var lines = rawText.Split('\n', StringSplitOptions.RemoveEmptyEntries);
         var cleanedLines = new List<string>();
 
-        foreach (var originalLine in lines)
+        foreach (var originalLine in rawLines)
         {
             var line = originalLine.Trim();
             if (string.IsNullOrEmpty(line)) continue;
 
-            // 1. Remove lone symbols/artifacts like |, ~, _, `, etc.
-            line = Regex.Replace(line, @"^[|~_`•\-\—\s]+|[|~_`•\-\—\s]+$", "");
-            if (line.Length <= 1 && !char.IsLetterOrDigit(line[0])) continue;
+            // Strip stray borders/ornament artifact lines like "-----" or "~~~~~" or lone quotes
+            if (Regex.IsMatch(line, @"^[—\-=_~`|\.\,\:\;\*\s\<\>\(\)\{\}\[\]\^\@\#\$\%\&]+$"))
+            {
+                continue;
+            }
 
-            // 2. Fix Mixed Case errors inside words (e.g. "конуилаРи" -> "қонунлари")
-            line = FixMixedCaseInWords(line);
+            // Remove leading/trailing symbols except numbers and letters
+            line = Regex.Replace(line, @"^[|~_`•\—\s]+|[|~_`•\—\s]+$", "");
 
-            // 3. Apply Uzbek & Cyrillic standard dictionary replacements
-            line = FixCommonUzbekOcrTypos(line);
+            // Single characters: allow numbers (1, 2, 3...) or Roman numerals (I, V, X) or single valid letters
+            if (line.Length == 1 && !char.IsLetterOrDigit(line[0]))
+            {
+                continue;
+            }
 
-            // 4. Fix spaces around punctuation
+            // Apply case-preserving dictionary fixes for Uzbek & common OCR misrecognitions
+            line = FixUzbekWordsWithCasePreservation(line);
+
+            // Harmonize line casing: If line is predominantly UPPERCASE (e.g. "АБДУЛЛА ҚОДИРИЙ", "ХАЛҚ МЕРОСИ"), make entire line UPPERCASE
+            line = HarmonizeLineCase(line);
+
+            // Clean spaces around punctuation
             line = Regex.Replace(line, @"\s+([,.:;?!])", "$1");
             line = Regex.Replace(line, @"([,.:;?!])([^\s0-9])", "$1 $2");
             line = Regex.Replace(line, @"\s{2,}", " ");
@@ -151,96 +158,110 @@ public static class WindowsNativeOcr
         return string.Join("\n", cleanedLines).Trim();
     }
 
-    private static string FixMixedCaseInWords(string line)
+    private static string FixUzbekWordsWithCasePreservation(string line)
     {
-        // Matches words with mixed lower and upper case (e.g. "конуилаРи", "ЖИЛДлик", "ноМИдаги")
-        return Regex.Replace(line, @"\b\p{L}+\b", m =>
+        // Dictionary of words: Pattern -> Correct Uzbek spelling
+        var replacements = new (string Pattern, string Target)[]
         {
-            var word = m.Value;
-            if (word.Length <= 2) return word;
-
-            var upperCount = word.Count(char.IsUpper);
-            var lowerCount = word.Count(char.IsLower);
-
-            // If mostly UPPERCASE with 1-2 lower case letters (e.g. "ЖИЛДлИК"), make all UPPERCASE
-            if (upperCount >= word.Length - 1 && upperCount > lowerCount)
-            {
-                return word.ToUpperInvariant();
-            }
-
-            // If starting with Upper and mostly lower case with accidental middle/end upper (e.g. "конуилаРи"), make lowercase except first
-            if (lowerCount > upperCount)
-            {
-                if (char.IsUpper(word[0]))
-                {
-                    return char.ToUpper(word[0]) + word.Substring(1).ToLowerInvariant();
-                }
-                return word.ToLowerInvariant();
-            }
-
-            return word;
-        });
-    }
-
-    private static string FixCommonUzbekOcrTypos(string line)
-    {
-        // Dictionary of standard Uzbek Cyrillic OCR misreadings
-        var replacements = new (string Pattern, string Replacement)[]
-        {
-            // Title & Concept words
+            // Title words
             (@"\bконуила?ри\b", "қонунлари"),
-            (@"\bКОНУИЛА?РИ\b", "ҚОНУНЛАРИ"),
             (@"\bконунлари\b", "қонунлари"),
-            (@"\bКОНУНЛАРИ\b", "ҚОНУНЛАРИ"),
             (@"\bконуни\b", "қонуни"),
-            (@"\bКОНУНИ\b", "ҚОНУНИ"),
-
-            // Names & Publishers
-            (@"\bномиддги\b", "номидаги"),
-            (@"\bНОМИДДГИ\b", "НОМИДАГИ"),
-            (@"\bномидаги\b", "номидаги"),
-            (@"\bкодирий\b", "қодирий"),
-            (@"\bКОДИРИЙ\b", "ҚОДИРИЙ"),
-            (@"\bКодирий\b", "Қодирий"),
-            (@"\bхалк\b", "халқ"),
-            (@"\bХАЛК\b", "ХАЛҚ"),
-            (@"\bХалк\b", "Халқ"),
-            (@"\bмероси\b", "мероси"),
-            (@"\bМЕРОСИ\b", "МЕРОСИ"),
-            (@"\bнашриёти\b", "нашриёти"),
-            (@"\bНАШРИЁТИ\b", "НАШРИЁТИ"),
-
-            // Common Uzbek administrative & literary words
-            (@"\bузбекистон\b", "ўзбекистон"),
-            (@"\bУЗБЕКИСТОН\b", "ЎЗБЕКИСТОН"),
-            (@"\bУзбекистон\b", "Ўзбекистон"),
-            (@"\bкулёзма\b", "қўлёзма"),
-            (@"\bКУЛЁЗМА\b", "ҚЎЛЁЗМА"),
-            (@"\bКулёзма\b", "Қўлёзма"),
-            (@"\bкисм\b", "қисм"),
-            (@"\bКИСМ\b", "ҚИСМ"),
-            (@"\bКисм\b", "Қисм"),
-            (@"\bкулланма\b", "қўлланма"),
-            (@"\bКУЛЛАНМА\b", "ҚЎЛЛАНМА"),
-            (@"\bжумхурияти\b", "жумҳурияти"),
-            (@"\bЖУМХУРИЯТИ\b", "ЖУМҲУРИЯТИ"),
-            (@"\bкитоби\b", "китоби"),
-            (@"\bКИТОБИ\b", "КИТОБИ"),
             (@"\bсайланма\b", "сайланма"),
-            (@"\bСАЙЛАНМА\b", "САЙЛАНМА"),
             (@"\bжилдлик\b", "жилдлик"),
-            (@"\bЖИЛДЛИК\b", "ЖИЛДЛИК"),
+            (@"\bжилд\b", "жилд"),
+
+            // Names & Locations
+            (@"\bабу\b", "абу"),
+            (@"\bали\b", "али"),
+            (@"\bибн\b", "ибн"),
+            (@"\bсино\b", "сино"),
+            (@"\bтоwкеht\b", "тошкент"),
+            (@"\btowkeht\b", "тошкент"),
             (@"\bтошкент\b", "тошкент"),
-            (@"\bТОШКЕНТ\b", "ТОШКЕНТ"),
-            (@"\bибн сино\b", "ибн сино"),
-            (@"\bИБН СИНО\b", "ИБН СИНО"),
-            (@"\bабу али\b", "абу али"),
-            (@"\bАБУ АЛИ\b", "АБУ АЛИ")
+            (@"\bабдулла\b", "абдулла"),
+            (@"\bкодирий\b", "қодирий"),
+            (@"\bкодирий,\b", "қодирий"),
+            (@"\bномиддги\b", "номидаги"),
+            (@"\bномидаги\b", "номидаги"),
+            (@"\bхалк\b", "халқ"),
+            (@"\bхалк,\b", "халқ"),
+            (@"\bмероси\b", "мероси"),
+            (@"\bнашриёти\b", "нашриёти"),
+
+            // State & Academic terms
+            (@"\bузбекистон\b", "ўзбекистон"),
+            (@"\bкулёзма\b", "қўлёзма"),
+            (@"\bкисм\b", "қисм"),
+            (@"\bкулланма\b", "қўлланма"),
+            (@"\bжумхурияти\b", "жумҳурияти"),
+            (@"\bкитоби\b", "китоби")
         };
 
-        foreach (var (pattern, rep) in replacements)
+        foreach (var (pattern, target) in replacements)
         {
-            line = Regex.Replace(line, pattern, rep, RegexOptions.IgnoreCase);
+            line = Regex.Replace(line, pattern, match =>
+            {
+                var orig = match.Value.TrimEnd(',', '.');
+                var hasComma = match.Value.EndsWith(",");
+                var hasPeriod = match.Value.EndsWith(".");
+
+                var rep = MatchWordCase(orig, target);
+                if (hasComma) rep += ",";
+                if (hasPeriod) rep += ".";
+                return rep;
+            }, RegexOptions.IgnoreCase);
+        }
+
+        return line;
+    }
+
+    private static string MatchWordCase(string original, string target)
+    {
+        if (string.IsNullOrEmpty(original) || string.IsNullOrEmpty(target)) return target;
+
+        var letters = original.Where(char.IsLetter).ToList();
+        if (letters.Count == 0) return target;
+
+        // If original is ALL UPPERCASE (e.g. "КОДИРИЙ", "ХАЛК", "УЧ", "ЖИЛД") -> "ҚОДИРИЙ", "ХАЛҚ"
+        if (letters.All(char.IsUpper))
+        {
+            return target.ToUpperInvariant();
+        }
+
+        // If original is TitleCase (e.g. "Кодирий", "Халк") -> "Қодирий", "Халқ"
+        if (char.IsUpper(letters[0]) && letters.Skip(1).All(char.IsLower))
+        {
+            return char.ToUpper(target[0]) + (target.Length > 1 ? target.Substring(1).ToLowerInvariant() : "");
+        }
+
+        // If original is all lowercase -> all lowercase
+        if (letters.All(char.IsLower))
+        {
+            return target.ToLowerInvariant();
+        }
+
+        // Mixed case OCR glitch (e.g. "конуилаРи") -> TitleCase if first is Upper, else lowercase
+        if (char.IsUpper(original[0]))
+        {
+            return char.ToUpper(target[0]) + (target.Length > 1 ? target.Substring(1).ToLowerInvariant() : "");
+        }
+
+        return target.ToLowerInvariant();
+    }
+
+    private static string HarmonizeLineCase(string line)
+    {
+        var words = Regex.Matches(line, @"\p{L}+").Select(m => m.Value).ToList();
+        if (words.Count <= 1) return line;
+
+        var upperWords = words.Count(w => w.All(char.IsUpper) && w.Length > 1);
+
+        // If 60%+ of the words in the line are ALL UPPERCASE (e.g. "АБДУЛЛА қодирий", "халқ МЕРОСИ", "уч ЖИЛДЛИК САЙЛАНМА")
+        // Make the entire line UPPERCASE for consistency!
+        if ((double)upperWords / words.Count >= 0.5)
+        {
+            return line.ToUpperInvariant();
         }
 
         return line;

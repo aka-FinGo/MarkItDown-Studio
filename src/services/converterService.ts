@@ -84,46 +84,66 @@ export function cleanOcrText(rawText: string): string {
     [/\bконуила?ри\b/gi, "қонунлари"],
     [/\bконунлари\b/gi, "қонунлари"],
     [/\bконуни\b/gi, "қонуни"],
+    [/\bсайланма\b/gi, "сайланма"],
+    [/\bжилдлик\b/gi, "жилдлик"],
+    [/\bжилд\b/gi, "жилд"],
+    [/\bабу\b/gi, "абу"],
+    [/\bали\b/gi, "али"],
+    [/\bибн\b/gi, "ибн"],
+    [/\bсино\b/gi, "сино"],
+    [/\bтоwкеht\b/gi, "тошкент"],
+    [/\btowkeht\b/gi, "тошкент"],
+    [/\bтошкент\b/gi, "тошкент"],
+    [/\bабдулла\b/gi, "абдулла"],
+    [/\bкодирий\b/gi, "қодирий"],
     [/\bномиддги\b/gi, "номидаги"],
     [/\bномидаги\b/gi, "номидаги"],
-    [/\bкодирий\b/gi, "қодирий"],
     [/\bхалк\b/gi, "халқ"],
+    [/\bмероси\b/gi, "мероси"],
+    [/\bнашриёти\b/gi, "нашриёти"],
     [/\bузбекистон\b/gi, "ўзбекистон"],
     [/\bкулёзма\b/gi, "қўлёзма"],
     [/\bкисм\b/gi, "қисм"],
     [/\bкулланма\b/gi, "қўлланма"],
     [/\bжумхурияти\b/gi, "жумҳурияти"],
     [/\bкитоби\b/gi, "китоби"],
-    [/\bсайланма\b/gi, "сайланма"],
-    [/\bжилдлик\b/gi, "жилдлик"],
-    [/\bтошкент\b/gi, "тошкент"],
   ];
+
+  const matchCase = (orig: string, target: string): string => {
+    if (!orig || !target) return target;
+    const letters = orig.replace(/[^a-zA-Zа-яА-ЯёЁ]/g, "");
+    if (!letters) return target;
+    if (letters === letters.toUpperCase()) return target.toUpperCase();
+    if (letters.charAt(0) === letters.charAt(0).toUpperCase() && letters.slice(1) === letters.slice(1).toLowerCase()) {
+      return target.charAt(0).toUpperCase() + target.slice(1).toLowerCase();
+    }
+    return target.toLowerCase();
+  };
 
   for (const originalLine of lines) {
     let line = originalLine.trim();
     if (!line) continue;
 
-    // Remove stray artifact characters
+    // Filter out pure border artifact noise
+    if (/^[—\-=_~`|\.\,\:\;\*\s\<\>\(\)\{\}\[\]\^\@\#\$\%\&]+$/.test(line)) {
+      continue;
+    }
+
     line = line.replace(/^[|~_`•\-\—\s]+|[|~_`•\-\—\s]+$/g, "");
-    if (line.length <= 1 && !/[a-zA-Zа-яА-Я0-9]/.test(line[0])) continue;
+    if (line.length === 1 && !/[a-zA-Zа-яА-Я0-9]/.test(line[0])) continue;
 
-    // Fix mixed case glitch inside words (e.g. "конуилаРи" -> "қонунлари")
-    line = line.replace(/\b[\p{L}]+\b/gu, (word) => {
-      if (word.length <= 2) return word;
-      const uppers = (word.match(/[A-ZА-ЯЁ]/g) || []).length;
-      const lowers = (word.match(/[a-zа-яё]/g) || []).length;
-      if (uppers >= word.length - 1 && uppers > lowers) return word.toUpperCase();
-      if (lowers > uppers) {
-        return word.charAt(0).toUpperCase() === word.charAt(0)
-          ? word.charAt(0) + word.slice(1).toLowerCase()
-          : word.toLowerCase();
-      }
-      return word;
-    });
-
-    // Apply dictionary replacements
+    // Case-preserving dictionary replacements
     for (const [pattern, rep] of replacements) {
-      line = line.replace(pattern, rep);
+      line = line.replace(pattern, (match) => matchCase(match, rep));
+    }
+
+    // Line casing harmonization (if line is predominantly UPPERCASE, make entire line UPPERCASE)
+    const words = line.match(/[\p{L}]+/gu) || [];
+    if (words.length > 0) {
+      const uppers = words.filter((w) => w === w.toUpperCase() && w.length > 1).length;
+      if (uppers / words.length >= 0.5) {
+        line = line.toUpperCase();
+      }
     }
 
     line = line.replace(/\s+([,.:;?!])/g, "$1").replace(/([,.:;?!])([^\s0-9])/g, "$1 $2").replace(/\s{2,}/g, " ");
