@@ -12,6 +12,7 @@ using MarkItDown.Core.Ai;
 using MarkItDown.Core.Models;
 using MarkItDown.Core.Ocr;
 using Markdig;
+using Markdig.Wpf;
 
 namespace MarkItDown.App;
 
@@ -47,7 +48,7 @@ public partial class MainWindow : Window
         _config = AppConfig.Load();
 
         _markdownPipeline = new MarkdownPipelineBuilder()
-            .UseAdvancedExtensions()
+            .UseSupportedExtensions()
             .Build();
 
         LstConvertedItems.ItemsSource = ConvertedItems;
@@ -303,7 +304,7 @@ public partial class MainWindow : Window
         ViewGridSplitter.Visibility = Visibility.Collapsed;
         PreviewInnerBorder.Visibility = Visibility.Visible;
 
-        WebMarkdownPreview.Visibility = Visibility.Collapsed;
+        DocMarkdownPreview.Visibility = Visibility.Collapsed;
         TxtPlainTextPreview.Visibility = Visibility.Visible;
 
         // Render plain text
@@ -318,7 +319,7 @@ public partial class MainWindow : Window
         BtnViewEditor.Style = (Style)FindResource("GlassButton");
     }
 
-    // 2. 🔮 Obsidian Preview (Rich Styled Markdown HTML)
+    // 2. 🔮 Obsidian Preview (Rich Styled Native FlowDocument)
     private void BtnViewObsidian_Click(object sender, RoutedEventArgs e)
     {
         _currentContentType = "Obsidian";
@@ -332,10 +333,10 @@ public partial class MainWindow : Window
         ViewGridSplitter.Visibility = Visibility.Collapsed;
         PreviewInnerBorder.Visibility = Visibility.Visible;
 
-        WebMarkdownPreview.Visibility = Visibility.Visible;
+        DocMarkdownPreview.Visibility = Visibility.Visible;
         TxtPlainTextPreview.Visibility = Visibility.Collapsed;
 
-        // Render Obsidian HTML
+        // Render Obsidian Native Document
         UpdatePreviewHtml(TxtMarkdownEditor.Text);
 
         BtnViewEditor.IsEnabled = true;
@@ -366,7 +367,7 @@ public partial class MainWindow : Window
             TxtPlainTextEditor.Visibility = Visibility.Visible;
             TxtPlainTextEditor.Text = StripMarkdownToPlainText(TxtMarkdownEditor.Text);
 
-            WebMarkdownPreview.Visibility = Visibility.Collapsed;
+            DocMarkdownPreview.Visibility = Visibility.Collapsed;
             TxtPlainTextPreview.Visibility = Visibility.Visible;
             TxtPlainTextPreview.Text = TxtPlainTextEditor.Text;
         }
@@ -375,7 +376,7 @@ public partial class MainWindow : Window
             TxtMarkdownEditor.Visibility = Visibility.Visible;
             TxtPlainTextEditor.Visibility = Visibility.Collapsed;
 
-            WebMarkdownPreview.Visibility = Visibility.Visible;
+            DocMarkdownPreview.Visibility = Visibility.Visible;
             TxtPlainTextPreview.Visibility = Visibility.Collapsed;
             UpdatePreviewHtml(TxtMarkdownEditor.Text);
         }
@@ -485,48 +486,18 @@ public partial class MainWindow : Window
     {
         try
         {
-            if (WebMarkdownPreview == null) return;
+            if (DocMarkdownPreview == null) return;
 
-            var htmlBody = Markdown.ToHtml(markdown ?? string.Empty, _markdownPipeline);
-            var fullHtml = $@"<!DOCTYPE html>
-<html>
-<head>
-<meta charset=""utf-8""/>
-<meta http-equiv=""X-UA-Compatible"" content=""IE=edge""/>
-<style>
-  body {{
-    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
-    background-color: #030712;
-    color: #F8FAFC;
-    padding: 24px;
-    line-height: 1.65;
-    font-size: 14px;
-  }}
-  h1, h2, h3, h4 {{ color: #818CF8; margin-top: 1.4em; margin-bottom: 0.5em; font-weight: 700; }}
-  h1 {{ font-size: 22px; border-bottom: 1px solid #1E293B; padding-bottom: 8px; }}
-  h2 {{ font-size: 18px; }}
-  h3 {{ font-size: 15px; }}
-  p {{ margin: 0.8em 0; }}
-  table {{ border-collapse: collapse; width: 100%; margin: 16px 0; }}
-  th, td {{ border: 1px solid #334155; padding: 8px 12px; text-align: left; }}
-  th {{ background-color: #1E293B; color: #A5B4FC; font-weight: 600; }}
-  tr:nth-child(even) {{ background-color: #0B1120; }}
-  pre, code {{ background-color: #0F172A; color: #38BDF8; padding: 2px 6px; border-radius: 4px; font-family: Consolas, 'Cascadia Code', monospace; font-size: 12px; }}
-  pre code {{ display: block; padding: 14px; overflow-x: auto; border: 1px solid #1E293B; }}
-  blockquote {{ border-left: 4px solid #6366F1; margin: 12px 0; padding: 8px 14px; color: #94A3B8; background: #0F172A66; border-radius: 0 6px 6px 0; }}
-  hr {{ border: 0; border-top: 1px solid #1E293B; margin: 24px 0; }}
-  a {{ color: #818CF8; text-decoration: none; }}
-  a:hover {{ text-decoration: underline; }}
-  img {{ max-width: 100%; border-radius: 8px; margin: 12px 0; border: 1px solid #1E293B; }}
-  ul, ol {{ padding-left: 24px; margin: 10px 0; }}
-  li {{ margin: 4px 0; }}
-</style>
-</head>
-<body>
-{htmlBody}
-</body>
-</html>";
-            WebMarkdownPreview.NavigateToString(fullHtml);
+            var doc = Markdig.Wpf.Markdown.ToFlowDocument(markdown ?? string.Empty, _markdownPipeline);
+            if (doc != null)
+            {
+                doc.Background = new SolidColorBrush(Color.FromRgb(3, 7, 18));
+                doc.Foreground = new SolidColorBrush(Color.FromRgb(248, 250, 252));
+                doc.FontFamily = new FontFamily("Segoe UI, Arial, sans-serif");
+                doc.FontSize = 13.5;
+                doc.PagePadding = new Thickness(16, 12, 16, 12);
+                DocMarkdownPreview.Document = doc;
+            }
         }
         catch (Exception ex)
         {

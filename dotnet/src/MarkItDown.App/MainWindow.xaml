@@ -403,11 +403,17 @@
                             <!-- GridSplitter for Split Mode -->
                             <GridSplitter x:Name="ViewGridSplitter" Grid.Column="1" Width="4" Background="#1E293B" Cursor="SizeWE" Visibility="Collapsed" HorizontalAlignment="Center" />
 
-                            <!-- Right: Live Rendered Preview (Obsidian HTML or Plain Text Clean Reader) -->
+                            <!-- Right: Live Rendered Preview (Obsidian Rich Native FlowDocument or Plain Text Clean Reader) -->
                             <Border x:Name="PreviewInnerBorder" Grid.Column="2" Background="#030712" BorderBrush="#1E293B" BorderThickness="1" CornerRadius="12" Padding="4" Visibility="Collapsed">
                                 <Grid>
-                                    <!-- Obsidian Rich HTML Preview -->
-                                    <WebBrowser x:Name="WebMarkdownPreview" Visibility="Visible" />
+                                    <!-- Obsidian Rich Native FlowDocument Preview -->
+                                    <FlowDocumentScrollViewer x:Name="DocMarkdownPreview"
+                                                              Background="#030712" Foreground="#F8FAFC"
+                                                              BorderThickness="0" Padding="14"
+                                                              IsToolBarVisible="False"
+                                                              VerticalScrollBarVisibility="Auto"
+                                                              HorizontalScrollBarVisibility="Disabled"
+                                                              Visibility="Visible" />
 
                                     <!-- Plain Text Clean Reader Preview -->
                                     <TextBox x:Name="TxtPlainTextPreview"

@@ -199,9 +199,50 @@ public static class WindowsNativeOcr
         line = Regex.Replace(line, @"\bшабкУрлик\b", m => MatchWordCase(m.Value, "шабкўрлик"), RegexOptions.IgnoreCase);
         line = Regex.Replace(line, @"\bкУкрак\b", m => MatchWordCase(m.Value, "кўкрак"), RegexOptions.IgnoreCase);
 
-        // 2. High-Precision Vocabulary Dictionary for Classical & Modern Uzbek Cyrillic OCR
+        // 2. Tuturq Belgisi (Hard Sign 'ъ') in Uzbek Cyrillic words
+        line = Regex.Replace(line, @"\bса[ь']дулла\b", m => MatchWordCase(m.Value, "саъдулла"), RegexOptions.IgnoreCase);
+        line = Regex.Replace(line, @"\bма[ь']сул\b", m => MatchWordCase(m.Value, "масъул"), RegexOptions.IgnoreCase);
+        line = Regex.Replace(line, @"\bта[ь']лим\b", m => MatchWordCase(m.Value, "таълим"), RegexOptions.IgnoreCase);
+        line = Regex.Replace(line, @"\bэ[ь']лон\b", m => MatchWordCase(m.Value, "эълон"), RegexOptions.IgnoreCase);
+        line = Regex.Replace(line, @"\bма[ь']руза\b", m => MatchWordCase(m.Value, "маъруза"), RegexOptions.IgnoreCase);
+        line = Regex.Replace(line, @"\bма[ь']лумот\b", m => MatchWordCase(m.Value, "маълумот"), RegexOptions.IgnoreCase);
+        line = Regex.Replace(line, @"\bмў[ь']табар\b", m => MatchWordCase(m.Value, "мўътабар"), RegexOptions.IgnoreCase);
+        line = Regex.Replace(line, @"\bжуз[ь']ий\b", m => MatchWordCase(m.Value, "жузъий"), RegexOptions.IgnoreCase);
+
+        // 3. High-Precision Vocabulary Dictionary for Publishing & Classical Uzbek Literature
         var replacements = new (string Pattern, string Target)[]
         {
+            // Publishing & Colophon Information
+            (@"\bилмий[- ]*с[ио]ммабо[пр]\b", "илмий-оммабоп"),
+            (@"\bилмий[- ]*оммабоп\b", "илмий-оммабоп"),
+            (@"\bмуса[,\s]*[ҳх]лила\b", "мусаҳҳиҳа"),
+            (@"\bмусаҳҳиҳа\b", "мусаҳҳиҳа"),
+            (@"\bмуцаххиха\b", "мусаҳҳиҳа"),
+            (@"\bму[ца][а-я]*ррир\b", "муҳаррир"),
+            (@"\bмухаррир\b", "муҳаррир"),
+            (@"\bмуҳаррир\b", "муҳаррир"),
+            (@"\bбосишк[*\sа-я]*а\b", "босишга"),
+            (@"\bбосишга\b", "босишга"),
+            (@"\bрухсат этилди\b", "рухсат этилди"),
+            (@"\bбосмахона\b", "босмахона"),
+            (@"\bкорози\b", "қоғози"),
+            (@"\bқорози\b", "қоғози"),
+            (@"\bкоғози\b", "қоғози"),
+            (@"\bқоғози\b", "қоғози"),
+            (@"\bюкори\b", "юқори"),
+            (@"\bюқори\b", "юқори"),
+            (@"\bта[б6]о[ғгf][ки]?\b", "табоғи"),
+            (@"\bтабоғи\b", "табоғи"),
+            (@"\bтабори\b", "табоғи"),
+            (@"\bкизи\b", "қизи"),
+            (@"\bқизи\b", "қизи"),
+            (@"\bшартно[ма]*\b", "шартнома"),
+            (@"\bадабий гарнитура\b", "адабий гарнитура"),
+            (@"\bтеришга берилди\b", "теришга берилди"),
+            (@"\bбичи\s*ми\b", "бичими"),
+            (@"\bусу\s*лида\b", "усулида"),
+            (@"\bкелишилган нархда\b", "келишилган нархда"),
+
             // Books, authors and publications
             (@"\bконуила?ри\b", "қонунлари"),
             (@"\bконунлари\b", "қонунлари"),
@@ -256,7 +297,6 @@ public static class WindowsNativeOcr
             (@"\bяллирланиши\b", "яллиғланиши"),
             (@"\bсоглигини\b", "соғлиғини"),
             (@"\bсорлигини\b", "соғлиғини"),
-            (@"\bжузъий\b", "жузъий"),
             (@"\bаъзолар(да)?\b", "аъзолар$1"),
             (@"\bмигрень\b", "мигрень"),
             (@"\bзотурриа\b", "зотуррия"),
