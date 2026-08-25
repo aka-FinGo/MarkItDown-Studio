@@ -9,6 +9,7 @@ using MarkItDown.Core;
 using MarkItDown.Core.Ai;
 using MarkItDown.Core.Models;
 using MarkItDown.Core.Ocr;
+using Markdig;
 
 namespace MarkItDown.App;
 
@@ -25,11 +26,14 @@ public partial class MainWindow : Window
     private readonly MarkItDownEngine _engine;
     private readonly UniversalAiClient _aiClient;
     private readonly AppConfig _config;
+    private readonly MarkdownPipeline _markdownPipeline;
+
     public ObservableCollection<ConversionResult> ConvertedItems { get; } = new();
     public ObservableCollection<PendingFileItem> SelectedFilesQueue { get; } = new();
     private ConversionResult? _activeResult;
     private bool _isInitializing = true;
     private string _currentLang = "uz";
+    private string _currentViewMode = "Editor"; // Editor, Preview, Split
 
     public MainWindow()
     {
@@ -37,6 +41,11 @@ public partial class MainWindow : Window
         _engine = new MarkItDownEngine();
         _aiClient = new UniversalAiClient();
         _config = AppConfig.Load();
+
+        _markdownPipeline = new MarkdownPipelineBuilder()
+            .UseAdvancedExtensions()
+            .Build();
+
         LstConvertedItems.ItemsSource = ConvertedItems;
         LstSelectedFilesQueue.ItemsSource = SelectedFilesQueue;
 
@@ -47,7 +56,13 @@ public partial class MainWindow : Window
 
     private void LoadSavedSettings()
     {
-        // 1. Language
+        // 1. AI Checkbox
+        if (ChkEnableAi != null)
+        {
+            ChkEnableAi.IsChecked = _config.EnableAi;
+        }
+
+        // 2. Language
         if (CmbLanguage != null)
         {
             var found = false;
@@ -68,7 +83,7 @@ public partial class MainWindow : Window
             }
         }
 
-        // 2. Theme
+        // 3. Theme
         if (CmbTheme != null)
         {
             var found = false;
@@ -89,7 +104,7 @@ public partial class MainWindow : Window
             }
         }
 
-        // 3. Provider
+        // 4. Provider
         if (CmbAiProvider != null)
         {
             var found = false;
@@ -110,13 +125,13 @@ public partial class MainWindow : Window
 
         PopulateModelNames(_config.SelectedProvider);
 
-        // 4. Model
+        // 5. Model
         if (CmbModelName != null && !string.IsNullOrEmpty(_config.SelectedModel))
         {
             CmbModelName.Text = _config.SelectedModel;
         }
 
-        // 5. API Key
+        // 6. API Key
         var savedKey = _config.GetApiKey(_config.SelectedProvider);
         if (TxtApiKey != null)
         {
@@ -124,11 +139,18 @@ public partial class MainWindow : Window
         }
         UpdateKeyStatusAndGuide(_config.SelectedProvider, savedKey);
 
-        // 6. Custom URL
+        // 7. Custom URL
         if (TxtCustomBaseUrl != null)
         {
             TxtCustomBaseUrl.Text = _config.CustomBaseUrl ?? "http://localhost:11434";
         }
+    }
+
+    private void ChkEnableAi_Changed(object sender, RoutedEventArgs e)
+    {
+        if (_isInitializing || ChkEnableAi == null) return;
+        _config.EnableAi = ChkEnableAi.IsChecked == true;
+        _config.Save();
     }
 
     private void CmbLanguage_SelectionChanged(object sender, SelectionChangedEventArgs e)
@@ -215,11 +237,7 @@ public partial class MainWindow : Window
 ## 1. Capabilities
 - **PDF, Word (.docx), Excel (.xlsx), PowerPoint (.pptx), CSV, JSON, HTML, Code and Images** converted to 100% clean Markdown.
 - **Queue Workflow:** Select files first, check the list, and click **✨ Convert Files to Markdown (.md)**!
-
-## 2. Universal AI Providers & Models
-- **Google Gemini:** `gemini-2.5-flash`, `gemini-2.5-pro`, `gemini-3.7-flash`
-- **Groq AI (Ultra-Fast 500+ tok/s):** `llama-3.3-70b-versatile`, `llama-3.1-8b-instant`, `deepseek-r1-distill-llama-70b`
-- **OpenAI, Claude 3.7, DeepSeek R1/V3, Ollama**.
+- **Split & Preview:** Switch between Editor, Live Preview, and Split view anytime!
 ",
             "ru" => @"# 📄 Добро пожаловать в MarkItDown Studio! 🚀
 
@@ -228,9 +246,7 @@ public partial class MainWindow : Window
 ## 1. Возможности
 - **PDF, Word (.docx), Excel (.xlsx), PowerPoint (.pptx), CSV, JSON, HTML, Код и Изображения** в 100% чистый Markdown.
 - **Очередь файлов:** Выберите файлы и нажмите **✨ Преобразовать файлы в Markdown (.md)**!
-
-## 2. Универсальные ИИ Провайдеры
-- **Google Gemini, Groq AI (500+ токенов/сек), OpenAI, Claude, DeepSeek, Ollama**.
+- **Split и Preview:** Переключайтесь между редактором и живым просмотром в любой момент!
 ",
             _ => @"# 📄 MarkItDown Studio ga Xush Kelibsiz! 🚀
 
@@ -239,15 +255,127 @@ public partial class MainWindow : Window
 ## 1. Imkoniyatlar
 - **PDF, Word (.docx), Excel (.xlsx), PowerPoint (.pptx), CSV, JSON, HTML, Kod va Rasmlar** 100% toza Markdown formatiga o'tkaziladi.
 - **Fayllar Navbati:** Fayllarni tanlang, ro'yxatni ko'ring va **✨ Matnni Markdown (.md) ga O'tkazish** tugmasini bosing!
-
-## 2. Universal AI Provayderlar
-- **Google Gemini, Groq AI (500+ tok/s), OpenAI, Claude, DeepSeek, Ollama**.
+- **Split & Preview:** Split (yonma-yon) yoki Jonli Preview ko'rinishlariga o'ting!
 "
         };
 
         if (TxtMarkdownEditor != null)
         {
             TxtMarkdownEditor.Text = welcomeMd;
+        }
+    }
+
+    // View Modes: Split, Preview, Editor
+    private void BtnViewEditor_Click(object sender, RoutedEventArgs e)
+    {
+        _currentViewMode = "Editor";
+        ColEditor.Width = new GridLength(1, GridUnitType.Star);
+        ColSplitter.Width = new GridLength(0);
+        ColPreview.Width = new GridLength(0);
+
+        EditorInnerBorder.Visibility = Visibility.Visible;
+        ViewGridSplitter.Visibility = Visibility.Collapsed;
+        PreviewInnerBorder.Visibility = Visibility.Collapsed;
+
+        BtnViewEditor.Style = (Style)FindResource("AccentButton");
+        BtnViewPreview.Style = (Style)FindResource("GlassButton");
+        BtnViewSplit.Style = (Style)FindResource("GlassButton");
+    }
+
+    private void BtnViewPreview_Click(object sender, RoutedEventArgs e)
+    {
+        _currentViewMode = "Preview";
+        ColEditor.Width = new GridLength(0);
+        ColSplitter.Width = new GridLength(0);
+        ColPreview.Width = new GridLength(1, GridUnitType.Star);
+
+        EditorInnerBorder.Visibility = Visibility.Collapsed;
+        ViewGridSplitter.Visibility = Visibility.Collapsed;
+        PreviewInnerBorder.Visibility = Visibility.Visible;
+
+        BtnViewEditor.Style = (Style)FindResource("GlassButton");
+        BtnViewPreview.Style = (Style)FindResource("AccentButton");
+        BtnViewSplit.Style = (Style)FindResource("GlassButton");
+
+        UpdatePreviewHtml(TxtMarkdownEditor?.Text ?? string.Empty);
+    }
+
+    private void BtnViewSplit_Click(object sender, RoutedEventArgs e)
+    {
+        _currentViewMode = "Split";
+        ColEditor.Width = new GridLength(1, GridUnitType.Star);
+        ColSplitter.Width = GridLength.Auto;
+        ColPreview.Width = new GridLength(1, GridUnitType.Star);
+
+        EditorInnerBorder.Visibility = Visibility.Visible;
+        ViewGridSplitter.Visibility = Visibility.Visible;
+        PreviewInnerBorder.Visibility = Visibility.Visible;
+
+        BtnViewEditor.Style = (Style)FindResource("GlassButton");
+        BtnViewPreview.Style = (Style)FindResource("GlassButton");
+        BtnViewSplit.Style = (Style)FindResource("AccentButton");
+
+        UpdatePreviewHtml(TxtMarkdownEditor?.Text ?? string.Empty);
+    }
+
+    private void TxtMarkdownEditor_TextChanged(object sender, TextChangedEventArgs e)
+    {
+        if (_currentViewMode == "Split" || _currentViewMode == "Preview")
+        {
+            UpdatePreviewHtml(TxtMarkdownEditor.Text);
+        }
+    }
+
+    private void UpdatePreviewHtml(string markdown)
+    {
+        try
+        {
+            if (WebMarkdownPreview == null) return;
+
+            var htmlBody = Markdown.ToHtml(markdown ?? string.Empty, _markdownPipeline);
+            var fullHtml = $@"<!DOCTYPE html>
+<html>
+<head>
+<meta charset=""utf-8""/>
+<meta http-equiv=""X-UA-Compatible"" content=""IE=edge""/>
+<style>
+  body {{
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+    background-color: #030712;
+    color: #F8FAFC;
+    padding: 24px;
+    line-height: 1.65;
+    font-size: 14px;
+  }}
+  h1, h2, h3, h4 {{ color: #818CF8; margin-top: 1.4em; margin-bottom: 0.5em; font-weight: 700; }}
+  h1 {{ font-size: 22px; border-bottom: 1px solid #1E293B; padding-bottom: 8px; }}
+  h2 {{ font-size: 18px; }}
+  h3 {{ font-size: 15px; }}
+  p {{ margin: 0.8em 0; }}
+  table {{ border-collapse: collapse; width: 100%; margin: 16px 0; }}
+  th, td {{ border: 1px solid #334155; padding: 8px 12px; text-align: left; }}
+  th {{ background-color: #1E293B; color: #A5B4FC; font-weight: 600; }}
+  tr:nth-child(even) {{ background-color: #0B1120; }}
+  pre, code {{ background-color: #0F172A; color: #38BDF8; padding: 2px 6px; border-radius: 4px; font-family: Consolas, 'Cascadia Code', monospace; font-size: 12px; }}
+  pre code {{ display: block; padding: 14px; overflow-x: auto; border: 1px solid #1E293B; }}
+  blockquote {{ border-left: 4px solid #6366F1; margin: 12px 0; padding: 8px 14px; color: #94A3B8; background: #0F172A66; border-radius: 0 6px 6px 0; }}
+  hr {{ border: 0; border-top: 1px solid #1E293B; margin: 24px 0; }}
+  a {{ color: #818CF8; text-decoration: none; }}
+  a:hover {{ text-decoration: underline; }}
+  img {{ max-width: 100%; border-radius: 8px; margin: 12px 0; border: 1px solid #1E293B; }}
+  ul, ol {{ padding-left: 24px; margin: 10px 0; }}
+  li {{ margin: 4px 0; }}
+</style>
+</head>
+<body>
+{htmlBody}
+</body>
+</html>";
+            WebMarkdownPreview.NavigateToString(fullHtml);
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[Preview] Render xatosi: {ex.Message}");
         }
     }
 
@@ -459,7 +587,7 @@ public partial class MainWindow : Window
     {
         return new ConversionOptions
         {
-            EnableAi = true,
+            EnableAi = ChkEnableAi?.IsChecked == true,
             IncludeFrontmatter = false,
             CustomPrompt = _config.CustomPrompt,
             AutoOcrScannedPdf = true
@@ -611,6 +739,24 @@ public partial class MainWindow : Window
             }
             catch (Exception ex)
             {
+                // Graceful fallback to offline engine on API errors without crash
+                if (options.EnableAi)
+                {
+                    try
+                    {
+                        var offlineOptions = new ConversionOptions { EnableAi = false, AutoOcrScannedPdf = true };
+                        var fallbackResults = await _engine.ConvertFileAsync(path, offlineOptions, null);
+                        foreach (var result in fallbackResults)
+                        {
+                            ConvertedItems.Insert(0, result);
+                            SetActiveResult(result);
+                        }
+                        MessageBox.Show($"AI API xatolik berdi ({ex.Message}).\nFayl Oflayn Dvigatel orqali muvaffaqiyatli o'girildi!", "Ogohlantirish", MessageBoxButton.OK, MessageBoxImage.Information);
+                        continue;
+                    }
+                    catch { }
+                }
+
                 MessageBox.Show($"Xatolik ({Path.GetFileName(path)}):\n{ex.Message}", "Xatolik", MessageBoxButton.OK, MessageBoxImage.Warning);
             }
         }
@@ -647,6 +793,10 @@ public partial class MainWindow : Window
         if (TxtDocStats != null) TxtDocStats.Text = $"{result.FileName} • {result.WordCount:N0} ta so'z • {result.CharCount:N0} ta belgi";
         if (TxtDocEngine != null) TxtDocEngine.Text = $"⏱ {result.DurationMs} ms • {result.EngineName}";
         if (TxtMarkdownEditor != null) TxtMarkdownEditor.Text = result.Markdown;
+        if (_currentViewMode == "Split" || _currentViewMode == "Preview")
+        {
+            UpdatePreviewHtml(result.Markdown);
+        }
     }
 
     private void LstConvertedItems_SelectionChanged(object sender, SelectionChangedEventArgs e)
@@ -710,7 +860,7 @@ public partial class MainWindow : Window
         }
         catch (Exception ex)
         {
-            MessageBox.Show($"AI error:\n{ex.Message}", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
+            MessageBox.Show($"AI tahlilida xatolik yuz berdi ({ex.Message}). API kalitini tekshirib ko'ring.", "AI Xatoligi", MessageBoxButton.OK, MessageBoxImage.Warning);
         }
     }
 
