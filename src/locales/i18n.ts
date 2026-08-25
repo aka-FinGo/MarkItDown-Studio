@@ -11,11 +11,17 @@ export interface Translations {
   keySaved: string;
   keyMissing: string;
   enableAiVision: string;
+  tabFiles: string;
+  tabUrl: string;
+  tabText: string;
   dropTitle: string;
   dropSubtitle: string;
   selectFile: string;
   urlPlaceholder: string;
   convertUrl: string;
+  convertRawText: string;
+  pasteClipboard: string;
+  rawTextPlaceholder: string;
   convertedDocs: string;
   clearAll: string;
   aiProofread: string;
@@ -47,7 +53,7 @@ export interface Translations {
 export const TRANSLATIONS: Record<Language, Translations> = {
   uz: {
     appTitle: "MarkItDown Studio",
-    badge: "Obsidian & Multi-AI",
+    badge: "v0.0.3 • Multi-AI & Win+Shift+S",
     theme: "Mavzu:",
     language: "Til:",
     aiProvider: "AI Provayder:",
@@ -56,11 +62,17 @@ export const TRANSLATIONS: Record<Language, Translations> = {
     keySaved: "🔒 Kalit saqlandi",
     keyMissing: "⚠️ Kalit kiritilmagan",
     enableAiVision: "AI Vision OCR",
+    tabFiles: "📁 Fayllar",
+    tabUrl: "🌐 Web URL",
+    tabText: "📝 Matn / Bufer",
     dropTitle: "Faylni bu yerga tashlang",
     dropSubtitle: "PDF, Word, Excel, PPTX, Rasm (OCR), Audio, ZIP, Kod",
     selectFile: "Fayl Tanlash...",
     urlPlaceholder: "https://uz.wikipedia.org/wiki/Markdown",
     convertUrl: "URL O'girish",
+    convertRawText: "✨ Matnni Markdown (.md) ga O'tkazish",
+    pasteClipboard: "📋 Buferdan Qo'yish (Ctrl+V / Win+Shift+S)",
+    rawTextPlaceholder: "Bu yerga xohlagan xom matnni yozing yoki Win+Shift+S orqali rasm oling...",
     convertedDocs: "O'girilgan Hujjatlar",
     clearAll: "Barchasini Tozalash",
     aiProofread: "✨ AI Bilan Tekshirish",
@@ -85,12 +97,12 @@ export const TRANSLATIONS: Record<Language, Translations> = {
     viewSplit: "Split",
     viewPreview: "Preview",
     viewEditor: "Editor",
-    readyStatus: "Tayyor. PDF, Word, Excel, PPTX, Rasm yoki Audio yuklang.",
+    readyStatus: "Tayyor. PDF, Word, Excel, PPTX, Rasm yoki Win+Shift+S skrinshotini Ctrl+V bilan qo'ying.",
     footerTagline: "Multi-AI Auto-Fallback Arxitekturasi • 100% C# .NET 10 & Web",
   },
   en: {
     appTitle: "MarkItDown Studio",
-    badge: "Obsidian & Multi-AI",
+    badge: "v0.0.3 • Multi-AI & Win+Shift+S",
     theme: "Theme:",
     language: "Lang:",
     aiProvider: "AI Provider:",
@@ -99,11 +111,17 @@ export const TRANSLATIONS: Record<Language, Translations> = {
     keySaved: "🔒 Key saved",
     keyMissing: "⚠️ Key missing",
     enableAiVision: "AI Vision OCR",
+    tabFiles: "📁 Files",
+    tabUrl: "🌐 Web URL",
+    tabText: "📝 Text / Clipboard",
     dropTitle: "Drop your files here",
     dropSubtitle: "PDF, Word, Excel, PPTX, Images (OCR), Audio, ZIP, Code",
     selectFile: "Select Files...",
     urlPlaceholder: "https://en.wikipedia.org/wiki/Markdown",
     convertUrl: "Convert URL",
+    convertRawText: "✨ Convert Text to Markdown (.md)",
+    pasteClipboard: "📋 Paste from Clipboard (Ctrl+V / Win+Shift+S)",
+    rawTextPlaceholder: "Paste any raw text here or take a screenshot with Win+Shift+S...",
     convertedDocs: "Converted Documents",
     clearAll: "Clear All",
     aiProofread: "✨ AI Proofread",
@@ -128,12 +146,12 @@ export const TRANSLATIONS: Record<Language, Translations> = {
     viewSplit: "Split",
     viewPreview: "Preview",
     viewEditor: "Editor",
-    readyStatus: "Ready. Upload PDF, Word, Excel, PPTX, Image or Audio.",
+    readyStatus: "Ready. Upload PDF, Word, Excel, PPTX, Image or press Ctrl+V for Screenshot OCR.",
     footerTagline: "Multi-AI Auto-Fallback Architecture • 100% C# .NET 10 & Web",
   },
   ru: {
     appTitle: "MarkItDown Studio",
-    badge: "Obsidian и Мульти-ИИ",
+    badge: "v0.0.3 • Мульти-ИИ и Win+Shift+S",
     theme: "Тема:",
     language: "Язык:",
     aiProvider: "ИИ Провайдер:",
@@ -142,11 +160,17 @@ export const TRANSLATIONS: Record<Language, Translations> = {
     keySaved: "🔒 Ключ сохранен",
     keyMissing: "⚠️ Ключ не введен",
     enableAiVision: "AI Vision OCR",
+    tabFiles: "📁 Файлы",
+    tabUrl: "🌐 Web URL",
+    tabText: "📝 Текст / Буфер",
     dropTitle: "Перетащите файлы сюда",
     dropSubtitle: "PDF, Word, Excel, PPTX, Изображения (OCR), Аудио, ZIP, Код",
     selectFile: "Выбрать файлы...",
     urlPlaceholder: "https://ru.wikipedia.org/wiki/Markdown",
     convertUrl: "Конвертировать URL",
+    convertRawText: "✨ Преобразовать текст в Markdown (.md)",
+    pasteClipboard: "📋 Вставить из буфера (Ctrl+V / Win+Shift+S)",
+    rawTextPlaceholder: "Вставьте сюда любой текст или сделайте скриншот через Win+Shift+S...",
     convertedDocs: "Конвертированные файлы",
     clearAll: "Очистить всё",
     aiProofread: "✨ Проверить с ИИ",
@@ -171,7 +195,7 @@ export const TRANSLATIONS: Record<Language, Translations> = {
     viewSplit: "Раздельно",
     viewPreview: "Просмотр",
     viewEditor: "Редактор",
-    readyStatus: "Готово. Загрузите PDF, Word, Excel, PPTX, изображение или аудио.",
+    readyStatus: "Готово. Загрузите файл или нажмите Ctrl+V для OCR скриншота.",
     footerTagline: "Мульти-ИИ архитектура с авто-переключением • 100% C# .NET 10 и Web",
   },
 };

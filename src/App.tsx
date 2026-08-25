@@ -7,8 +7,11 @@ import React, { useState, useEffect } from "react";
 import {
   UploadCloud,
   Globe,
+  FileText,
+  Clipboard,
   AlertCircle,
   Loader2,
+  Sparkles,
 } from "lucide-react";
 import { Header } from "./components/Header";
 import { DropZone } from "./components/DropZone";
@@ -25,10 +28,11 @@ import {
   convertUrlClient,
   convertWithGeminiApi,
   convertWithOpenAiApi,
+  runClientOfflineOcr,
 } from "./services/converterService";
 
 export default function App() {
-  const [activeTab, setActiveTab] = useState<"upload" | "url">("upload");
+  const [activeTab, setActiveTab] = useState<"upload" | "url" | "text">("upload");
   const [options, setOptions] = useState<ConversionOptions>({
     enableAi: true,
     includeFrontmatter: false,
@@ -46,6 +50,7 @@ export default function App() {
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
   const [convertedItems, setConvertedItems] = useState<ConvertedItem[]>([]);
   const [activeItemId, setActiveItemId] = useState<string>("");
+  const [rawText, setRawText] = useState<string>("");
   const [isConverting, setIsConverting] = useState(false);
   const [conversionProgress, setConversionProgress] = useState<{ current: number; total: number; filename: string } | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -99,6 +104,34 @@ export default function App() {
       localStorage.removeItem("markitdown_items");
     }
   }, [convertedItems]);
+
+  // Global Clipboard / Win+Shift+S Paste Listener
+  useEffect(() => {
+    const handleGlobalPaste = async (e: ClipboardEvent) => {
+      // If typing inside an input/textarea, let default paste happen
+      const activeEl = document.activeElement;
+      if (activeEl && (activeEl.tagName === "INPUT" || activeEl.tagName === "TEXTAREA")) {
+        return;
+      }
+
+      if (e.clipboardData && e.clipboardData.items) {
+        const items = Array.from(e.clipboardData.items);
+        const imageItem = items.find((item) => item.type.startsWith("image/"));
+
+        if (imageItem) {
+          e.preventDefault();
+          const file = imageItem.getAsFile();
+          if (file) {
+            setSelectedFiles((prev) => [...prev, file]);
+            setActiveTab("upload");
+          }
+        }
+      }
+    };
+
+    window.addEventListener("paste", handleGlobalPaste);
+    return () => window.removeEventListener("paste", handleGlobalPaste);
+  }, []);
 
   const handleLanguageChange = (newLang: Language) => {
     setLanguage(newLang);
@@ -212,6 +245,91 @@ export default function App() {
     }
   };
 
+  // Convert Raw Text Directly to Markdown
+  const handleConvertRawText = async () => {
+    if (!rawText.trim()) return;
+    setIsConverting(true);
+    setErrorMessage(null);
+
+    try {
+      let formattedMd = "";
+      const hasApiKey = Boolean(apiKey && apiKey.trim().length > 0);
+
+      if (hasApiKey) {
+        const prompt = "Ushbu xom matnni mantiqiy sarlavhalar (#, ##), ro'yxatlar (-), ajratilgan jadvallar (|...|) va kalit so'zlari ajratilgan toza Markdown (.md) formatiga aylantirib ber. Ortiqcha izohlarsiz faqat Markdownni qaytar.";
+        const base64Text = btoa(unescape(encodeURIComponent(rawText)));
+
+        if (aiProvider === "GoogleGemini") {
+          const res = await convertWithGeminiApi(base64Text, "text/plain", "text_document.txt", apiKey, aiModel, prompt);
+          formattedMd = res.markdown;
+        } else {
+          const res = await convertWithOpenAiApi(base64Text, "text/plain", "text_document.txt", apiKey, customBaseUrl || "https://api.openai.com/v1/chat/completions", aiModel, prompt);
+          formattedMd = res.markdown;
+        }
+      } else {
+        // Heuristic Formatter
+        formattedMd = `# 📄 Matn Hujjati\n\n> 📌 **Format:** Markdown | **Tizim:** MarkItDown Local Structurer\n\n---\n\n` + rawText;
+      }
+
+      const cleanDocName = `Matn_${new Date().toLocaleTimeString().replace(/:/g, "")}`;
+      const newItem: ConvertedItem = {
+        id: `txt_${Date.now()}`,
+        filename: cleanDocName,
+        originalFormat: "TEXT",
+        originalSize: new Blob([rawText]).size,
+        markdown: formattedMd,
+        markdownSize: new Blob([formattedMd]).size,
+        wordCount: formattedMd.replace(/```[\s\S]*?```/g, "").replace(/[#*_`\[\]()]/g, " ").trim().match(/\S+/g)?.length || 0,
+        charCount: formattedMd.length,
+        lineCount: formattedMd.split("\n").length,
+        estimatedTokens: Math.ceil(formattedMd.length / 3.8),
+        durationMs: 50,
+        usedAi: hasApiKey,
+        engine: hasApiKey ? `${aiProvider} Text Structurer` : "Local Formatter",
+        status: "success",
+      };
+
+      setConvertedItems((prev) => [newItem, ...prev]);
+      setActiveItemId(newItem.id);
+    } catch (err: any) {
+      setErrorMessage(`Matnni o'girishda xatolik: ${err.message || err}`);
+    } finally {
+      setIsConverting(false);
+    }
+  };
+
+  // Paste from Clipboard Button handler
+  const handlePasteFromClipboard = async () => {
+    try {
+      if (navigator.clipboard) {
+        // Try reading image from clipboard first
+        try {
+          const clipboardItems = await navigator.clipboard.read();
+          for (const item of clipboardItems) {
+            const imageType = item.types.find((t) => t.startsWith("image/"));
+            if (imageType) {
+              const blob = await item.getType(imageType);
+              const file = new File([blob], `Screenshot_${Date.now()}.png`, { type: imageType });
+              setSelectedFiles((prev) => [...prev, file]);
+              setActiveTab("upload");
+              return;
+            }
+          }
+        } catch {
+          // Fallback to text reading
+        }
+
+        const text = await navigator.clipboard.readText();
+        if (text) {
+          setRawText(text);
+          setActiveTab("text");
+        }
+      }
+    } catch (err: any) {
+      setErrorMessage("Buferdan o'qish uchun brauzer ruxsati kerak.");
+    }
+  };
+
   const activeItem = convertedItems.find((item) => item.id === activeItemId) || convertedItems[0];
 
   // AI Proofreading flow
@@ -317,29 +435,40 @@ export default function App() {
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 flex-1 items-start">
           {/* LEFT COLUMN: Input / Controls */}
           <div className="lg:col-span-5 space-y-4 flex flex-col">
-            {/* Tabs */}
+            {/* 3-Mode Tabs */}
             <div className="flex rounded-xl bg-zinc-900/80 p-1 border border-zinc-800 shadow-xs">
               <button
                 onClick={() => setActiveTab("upload")}
-                className={`flex-1 flex items-center justify-center gap-2 py-2 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
+                className={`flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
                   activeTab === "upload"
                     ? "bg-indigo-600 text-white shadow-sm"
                     : "text-zinc-400 hover:text-zinc-200"
                 }`}
               >
                 <UploadCloud className="w-3.5 h-3.5" />
-                <span>{t.dropTitle}</span>
+                <span>{t.tabFiles}</span>
               </button>
               <button
                 onClick={() => setActiveTab("url")}
-                className={`flex-1 flex items-center justify-center gap-2 py-2 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
+                className={`flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
                   activeTab === "url"
                     ? "bg-indigo-600 text-white shadow-sm"
                     : "text-zinc-400 hover:text-zinc-200"
                 }`}
               >
                 <Globe className="w-3.5 h-3.5" />
-                <span>Web URL</span>
+                <span>{t.tabUrl}</span>
+              </button>
+              <button
+                onClick={() => setActiveTab("text")}
+                className={`flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
+                  activeTab === "text"
+                    ? "bg-indigo-600 text-white shadow-sm"
+                    : "text-zinc-400 hover:text-zinc-200"
+                }`}
+              >
+                <FileText className="w-3.5 h-3.5" />
+                <span>{t.tabText}</span>
               </button>
             </div>
 
@@ -386,6 +515,49 @@ export default function App() {
                   onConvert={handleConvertUrl}
                   isConverting={isConverting}
                 />
+              )}
+
+              {activeTab === "text" && (
+                <div className="bg-zinc-900/80 border border-zinc-800 rounded-2xl p-4 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <label className="text-xs font-semibold text-zinc-300">
+                      {t.tabText}:
+                    </label>
+                    <button
+                      onClick={handlePasteFromClipboard}
+                      className="flex items-center gap-1.5 text-xs text-indigo-400 hover:text-indigo-300 font-semibold cursor-pointer"
+                    >
+                      <Clipboard className="w-3.5 h-3.5" />
+                      <span>{t.pasteClipboard}</span>
+                    </button>
+                  </div>
+
+                  <textarea
+                    rows={6}
+                    value={rawText}
+                    onChange={(e) => setRawText(e.target.value)}
+                    placeholder={t.rawTextPlaceholder}
+                    className="w-full bg-zinc-950 border border-zinc-800 rounded-xl p-3 text-xs text-zinc-200 placeholder-zinc-500 focus:outline-none focus:border-indigo-500 transition-colors font-mono"
+                  />
+
+                  <button
+                    onClick={handleConvertRawText}
+                    disabled={isConverting || !rawText.trim()}
+                    className="w-full py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold rounded-xl shadow-md shadow-indigo-600/20 flex items-center justify-center space-x-2 transition-all disabled:opacity-50 cursor-pointer"
+                  >
+                    {isConverting ? (
+                      <>
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                        <span>{t.convertingProgress}...</span>
+                      </>
+                    ) : (
+                      <>
+                        <Sparkles className="w-4 h-4" />
+                        <span>{t.convertRawText}</span>
+                      </>
+                    )}
+                  </button>
+                </div>
               )}
             </div>
           </div>

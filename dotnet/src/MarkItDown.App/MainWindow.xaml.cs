@@ -1,13 +1,16 @@
 using System.Collections.ObjectModel;
 using System.IO;
+using System.Text.RegularExpressions;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Media;
+using System.Windows.Media.Imaging;
 using Microsoft.Win32;
 using MarkItDown.Core;
 using MarkItDown.Core.Ai;
 using MarkItDown.Core.Models;
+using MarkItDown.Core.Ocr;
 
 namespace MarkItDown.App;
 
@@ -149,12 +152,13 @@ public partial class MainWindow : Window
                 if (TxtDropSubtitle != null) TxtDropSubtitle.Text = "PDF, Word, Excel, PPTX, Images (OCR), Audio, ZIP, Code";
                 if (BtnSelectFile != null) BtnSelectFile.Content = "Select File...";
                 if (BtnConvertUrl != null) BtnConvertUrl.Content = "Convert URL";
+                if (BtnConvertRawText != null) BtnConvertRawText.Content = "✨ Convert Text to Markdown (.md)";
                 if (TxtHistoryTitle != null) TxtHistoryTitle.Text = "Converted Documents";
                 if (BtnClearAll != null) BtnClearAll.Content = "🗑️ Clear All";
                 if (BtnAiProofread != null) BtnAiProofread.Content = "✨ AI Proofread";
                 if (BtnCopyMarkdown != null) BtnCopyMarkdown.Content = "📋 Copy";
                 if (BtnSaveMarkdown != null) BtnSaveMarkdown.Content = "💾 Save .md";
-                if (TxtStatus != null) TxtStatus.Text = "Ready. Upload PDF, Word, Excel, PPTX, Image or Audio.";
+                if (TxtStatus != null) TxtStatus.Text = "Ready. Upload PDF, Word, Excel, PPTX, Image or press Ctrl+V for Screenshot OCR.";
                 if (TxtFooterTagline != null) TxtFooterTagline.Text = "Multi-AI Auto-Fallback Architecture • 100% C# .NET 10";
                 if (TxtModalHeader != null) TxtModalHeader.Text = "AI Analysis & Error Correction Result";
                 if (BtnModalCancel != null) BtnModalCancel.Content = "Cancel";
@@ -171,12 +175,13 @@ public partial class MainWindow : Window
                 if (TxtDropSubtitle != null) TxtDropSubtitle.Text = "PDF, Word, Excel, PPTX, Изображения (OCR), Аудио, ZIP, Код";
                 if (BtnSelectFile != null) BtnSelectFile.Content = "Выбрать файл...";
                 if (BtnConvertUrl != null) BtnConvertUrl.Content = "Конвертировать URL";
+                if (BtnConvertRawText != null) BtnConvertRawText.Content = "✨ Преобразовать текст в Markdown (.md)";
                 if (TxtHistoryTitle != null) TxtHistoryTitle.Text = "Конвертированные файлы";
                 if (BtnClearAll != null) BtnClearAll.Content = "🗑️ Очистить всё";
                 if (BtnAiProofread != null) BtnAiProofread.Content = "✨ Проверить с ИИ";
                 if (BtnCopyMarkdown != null) BtnCopyMarkdown.Content = "📋 Копировать";
                 if (BtnSaveMarkdown != null) BtnSaveMarkdown.Content = "💾 Сохранить .md";
-                if (TxtStatus != null) TxtStatus.Text = "Готово. Загрузите PDF, Word, Excel, PPTX, изображение или аудио.";
+                if (TxtStatus != null) TxtStatus.Text = "Готово. Загрузите файл или нажмите Ctrl+V для OCR скриншота.";
                 if (TxtFooterTagline != null) TxtFooterTagline.Text = "Мульти-ИИ архитектура с авто-переключением • 100% C# .NET 10";
                 if (TxtModalHeader != null) TxtModalHeader.Text = "Результат анализа и исправления ИИ";
                 if (BtnModalCancel != null) BtnModalCancel.Content = "Отмена";
@@ -193,12 +198,13 @@ public partial class MainWindow : Window
                 if (TxtDropSubtitle != null) TxtDropSubtitle.Text = "PDF, Word, Excel, PPTX, Rasm (OCR), Audio, ZIP, Kod";
                 if (BtnSelectFile != null) BtnSelectFile.Content = "Fayl Tanlash...";
                 if (BtnConvertUrl != null) BtnConvertUrl.Content = "URL O'girish";
+                if (BtnConvertRawText != null) BtnConvertRawText.Content = "✨ Matnni Markdown (.md) ga O'tkazish";
                 if (TxtHistoryTitle != null) TxtHistoryTitle.Text = "O'girilgan Hujjatlar";
                 if (BtnClearAll != null) BtnClearAll.Content = "🗑️ Barchasini Tozalash";
                 if (BtnAiProofread != null) BtnAiProofread.Content = "✨ AI Bilan Tekshirish";
                 if (BtnCopyMarkdown != null) BtnCopyMarkdown.Content = "📋 Nusxalash";
                 if (BtnSaveMarkdown != null) BtnSaveMarkdown.Content = "💾 .md Saqlash";
-                if (TxtStatus != null) TxtStatus.Text = "Tayyor. PDF, Word, Excel, PPTX, Rasm yoki Audio yuklang.";
+                if (TxtStatus != null) TxtStatus.Text = "Tayyor. PDF, Word, Excel, PPTX, Rasm yoki Win+Shift+S skrinshotini Ctrl+V bilan qo'ying.";
                 if (TxtFooterTagline != null) TxtFooterTagline.Text = "Multi-AI Auto-Fallback Architecture • 100% C# .NET 10";
                 if (TxtModalHeader != null) TxtModalHeader.Text = "AI Tahlili va Xatoliklarni Tuzatish Natijasi";
                 if (BtnModalCancel != null) BtnModalCancel.Content = "Bekor Qilish";
@@ -215,60 +221,41 @@ public partial class MainWindow : Window
         {
             "en" => @"# 📄 Welcome to MarkItDown Studio .NET! 🚀
 
-> 📌 **Document:** `Sample_Guide.md` | **System:** Multi-AI Smart Fallback Engine
+> 📌 **Document:** `Sample_Guide.md` | **System:** Multi-AI Smart Fallback Engine & Windows OCR
 
 ## 1. Capabilities
-- **PDF, Word (.docx), Excel (.xlsx), PowerPoint (.pptx), CSV, JSON, HTML, Code and ZIP** converted into 100% clean Markdown.
-- No unwanted clutter, original document flow preserved.
+- **PDF, Word (.docx), Excel (.xlsx), PowerPoint (.pptx), CSV, JSON, HTML, Code, ZIP, and Images**.
+- **Win+Shift+S Integration:** Take a screenshot and press `Ctrl+V` to immediately extract text with OCR into clean Markdown!
+- **Raw Text Conversion:** Paste any unformatted text and click **✨ Convert Text to Markdown (.md)** to automatically format it!
 
 ## 2. Universal AI Providers & Models
 - **Google Gemini:** `gemini-2.5-flash`, `gemini-2.5-pro`, `gemini-3.7-flash`, `gemini-3-flash`, `gemini-3-pro`
 - **Groq AI (Ultra-Fast 500+ tok/s):** `llama-3.3-70b-versatile`, `llama-3.1-8b-instant`, `deepseek-r1-distill-llama-70b`
-- **OpenAI:** `gpt-4o`, `gpt-4o-mini`, `o3-mini`, `o1`
-- **Anthropic Claude:** `claude-3-7-sonnet`, `claude-3-5-sonnet`, `claude-3-5-haiku`
-- **DeepSeek:** `deepseek-chat` (V3), `deepseek-reasoner` (R1)
-- **Ollama:** `llama3.2-vision`, `llava`, `qwen2.5-vl`
-
-## 3. Smart Fallback
-- If the selected model hits a rate limit or error, it seamlessly fails over to backup models without interrupting your workflow!
+- **OpenAI, Claude 3.7, DeepSeek R1/V3, Ollama**.
 ",
             "ru" => @"# 📄 Добро пожаловать в MarkItDown Studio .NET! 🚀
 
-> 📌 **Документ:** `Руководство.md` | **Система:** Мульти-ИИ движок с авто-переключением
+> 📌 **Документ:** `Руководство.md` | **Система:** Мульти-ИИ движок с авто-переключением и Windows OCR
 
 ## 1. Возможности
-- **PDF, Word (.docx), Excel (.xlsx), PowerPoint (.pptx), CSV, JSON, HTML, Код и ZIP** в 100% чистый Markdown.
-- Без лишнего мусора, с сохранением структуры оригинального документа.
+- **PDF, Word (.docx), Excel (.xlsx), PowerPoint (.pptx), CSV, JSON, HTML, Код, ZIP и Изображения**.
+- **Интеграция с Win+Shift+S:** Сделайте скриншот и нажмите `Ctrl+V`, чтобы мгновенно извлечь текст через OCR в Markdown!
+- **Преобразование текста:** Вставьте любой текст и нажмите **✨ Преобразовать текст в Markdown (.md)** для автоматического структурирования!
 
-## 2. Универсальные ИИ Провайдеры и Модели
-- **Google Gemini:** `gemini-2.5-flash`, `gemini-2.5-pro`, `gemini-3.7-flash`, `gemini-3-flash`, `gemini-3-pro`
-- **Groq AI (Сверхбыстрый 500+ ток/сек):** `llama-3.3-70b-versatile`, `llama-3.1-8b-instant`, `deepseek-r1-distill-llama-70b`
-- **OpenAI:** `gpt-4o`, `gpt-4o-mini`, `o3-mini`, `o1`
-- **Anthropic Claude:** `claude-3-7-sonnet`, `claude-3-5-sonnet`, `claude-3-5-haiku`
-- **DeepSeek:** `deepseek-chat` (V3), `deepseek-reasoner` (R1)
-- **Ollama:** `llama3.2-vision`, `llava`, `qwen2.5-vl`
-
-## 3. Умное авто-переключение (Fallback)
-- Если у выбранной модели исчерпан лимит запросов, система автоматически переключится на резервную модель без остановки работы!
+## 2. Универсальные ИИ Провайдеры
+- **Google Gemini, Groq AI (500+ ток/сек), OpenAI, Claude, DeepSeek, Ollama**.
 ",
             _ => @"# 📄 MarkItDown Studio .NET ga Xush Kelibsiz! 🚀
 
-> 📌 **Hujjat:** `Namuna_Qollanma.md` | **Tizim:** Multi-AI Smart Fallback Dvigatel
+> 📌 **Hujjat:** `Namuna_Qollanma.md` | **Tizim:** Multi-AI Smart Fallback Dvigatel & Windows OCR
 
 ## 1. Imkoniyatlar
-- **PDF, Word (.docx), Excel (.xlsx), PowerPoint (.pptx), CSV, JSON, HTML, Kod va ZIP** fayllarni 100% toza matnga o'girish.
-- Hech qanday ortiqcha axlat matnlarsiz, hujjatdagi asl tartib saqlanadi.
+- **PDF, Word (.docx), Excel (.xlsx), PowerPoint (.pptx), CSV, JSON, HTML, Kod, ZIP va Rasmlar**.
+- **Win+Shift+S Integratsiyasi:** `Win + Shift + S` orqali ekrandan rasm oling va dasturda `Ctrl + V` bosing — skrinshotdagi matn darhol OCR qilinib Markdown bo'ladi!
+- **Xom Matnni O'tkazish:** Istalgan xom matnni qo'yib **✨ Matnni Markdown (.md) ga O'tkazish** tugmasini bosing!
 
-## 2. Universal AI Provayderlar & Modellar
-- **Google Gemini:** `gemini-2.5-flash`, `gemini-2.5-pro`, `gemini-3.7-flash`, `gemini-3-flash`, `gemini-3-pro`, `gemini-3-deep-think`
-- **Groq AI (Ultra-Tez 500+ tok/s):** `llama-3.3-70b-versatile`, `llama-3.1-8b-instant`, `deepseek-r1-distill-llama-70b`
-- **OpenAI:** `gpt-4o`, `gpt-4o-mini`, `o3-mini`, `o1`
-- **Anthropic Claude:** `claude-3-7-sonnet`, `claude-3-5-sonnet`, `claude-3-5-haiku`
-- **DeepSeek:** `deepseek-chat` (V3), `deepseek-reasoner` (R1)
-- **Ollama:** `llama3.2-vision`, `llava`, `qwen2.5-vl`
-
-## 3. Smart Fallback (Avtomatik o'tish)
-- Agar tanlangan modelning limiti tugasa yoki band bo'lsa, tizim avtomatik zaxira modelga o'tib, konvertatsiyani to'xtovsiz davom ettiradi!
+## 2. Universal AI Provayderlar
+- **Google Gemini, Groq AI (500+ tok/s), OpenAI, Claude, DeepSeek, Ollama**.
 "
         };
 
@@ -276,6 +263,213 @@ public partial class MainWindow : Window
         {
             TxtMarkdownEditor.Text = welcomeMd;
         }
+    }
+
+    // Input Mode Tabs
+    private void BtnTabFiles_Click(object sender, RoutedEventArgs e)
+    {
+        SetInputMode(0);
+    }
+
+    private void BtnTabUrl_Click(object sender, RoutedEventArgs e)
+    {
+        SetInputMode(1);
+    }
+
+    private void BtnTabText_Click(object sender, RoutedEventArgs e)
+    {
+        SetInputMode(2);
+    }
+
+    private void SetInputMode(int mode)
+    {
+        if (PnlDropZoneMode == null || PnlUrlMode == null || PnlRawTextMode == null) return;
+
+        PnlDropZoneMode.Visibility = mode == 0 ? Visibility.Visible : Visibility.Collapsed;
+        PnlUrlMode.Visibility = mode == 1 ? Visibility.Visible : Visibility.Collapsed;
+        PnlRawTextMode.Visibility = mode == 2 ? Visibility.Visible : Visibility.Collapsed;
+
+        BtnTabFiles.Style = (Style)FindResource(mode == 0 ? "AccentButton" : "GlassButton");
+        BtnTabUrl.Style = (Style)FindResource(mode == 1 ? "AccentButton" : "GlassButton");
+        BtnTabText.Style = (Style)FindResource(mode == 2 ? "AccentButton" : "GlassButton");
+    }
+
+    // Global KeyDown: Ctrl+V Clipboard / Win+Shift+S Handler
+    private async void Window_KeyDown(object sender, KeyEventArgs e)
+    {
+        if (e.Key == Key.V && (Keyboard.Modifiers & ModifierKeys.Control) == ModifierKeys.Control)
+        {
+            // If focus is inside Markdown editor, let standard paste happen
+            if (TxtMarkdownEditor.IsFocused || TxtRawInput.IsFocused || TxtWebUrl.IsFocused || TxtApiKey.IsFocused)
+            {
+                return;
+            }
+
+            e.Handled = true;
+            await ProcessClipboardDataAsync();
+        }
+    }
+
+    private async void BtnPasteFromClipboard_Click(object sender, RoutedEventArgs e)
+    {
+        await ProcessClipboardDataAsync();
+    }
+
+    private async Task ProcessClipboardDataAsync()
+    {
+        try
+        {
+            // 1. Check if Clipboard contains an Image (e.g. from Win+Shift+S)
+            if (Clipboard.ContainsImage())
+            {
+                var bitmapSource = Clipboard.GetImage();
+                if (bitmapSource != null)
+                {
+                    if (TxtStatus != null) TxtStatus.Text = "Win+Shift+S skrinshotidan matn ajratilmoqda (OCR)...";
+
+                    byte[] imageBytes;
+                    var encoder = new PngBitmapEncoder();
+                    encoder.Frames.Add(BitmapFrame.Create(bitmapSource));
+                    using (var ms = new MemoryStream())
+                    {
+                        encoder.Save(ms);
+                        imageBytes = ms.ToArray();
+                    }
+
+                    var fileName = $"Screenshot_{DateTime.Now:yyyyMMdd_HHmmss}.png";
+                    var results = await _engine.ConvertBytesAsync(imageBytes, fileName, null, GetCurrentOptions(), GetCurrentAiConfig());
+
+                    foreach (var res in results)
+                    {
+                        ConvertedItems.Insert(0, res);
+                        SetActiveResult(res);
+                    }
+
+                    if (TxtStatus != null) TxtStatus.Text = "Skrinshot muvaffaqiyatli Markdown ga o'tkazildi!";
+                    return;
+                }
+            }
+
+            // 2. Check if Clipboard contains Text
+            if (Clipboard.ContainsText())
+            {
+                var text = Clipboard.GetText();
+                if (!string.IsNullOrWhiteSpace(text))
+                {
+                    if (TxtRawInput != null) TxtRawInput.Text = text;
+                    SetInputMode(2);
+                    await ConvertRawTextToMarkdownAsync(text);
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show($"Buferdan o'qishda xatolik: {ex.Message}", "Xatolik", MessageBoxButton.OK, MessageBoxImage.Warning);
+        }
+    }
+
+    // Direct Raw Text to Markdown Conversion Button
+    private async void BtnConvertRawText_Click(object sender, RoutedEventArgs e)
+    {
+        var rawText = TxtRawInput?.Text?.Trim();
+        if (string.IsNullOrEmpty(rawText))
+        {
+            MessageBox.Show("Iltimos, o'girish uchun matn kiriting yoki Win+Shift+S orqali rasm oling.", "Xabar", MessageBoxButton.OK, MessageBoxImage.Information);
+            return;
+        }
+
+        await ConvertRawTextToMarkdownAsync(rawText);
+    }
+
+    private async Task ConvertRawTextToMarkdownAsync(string rawText)
+    {
+        if (TxtStatus != null) TxtStatus.Text = "Matn Markdown ga aylantirilmoqda...";
+
+        var aiConfig = GetCurrentAiConfig();
+        var hasApiKey = !string.IsNullOrWhiteSpace(aiConfig.ApiKey) || aiConfig.Provider == AiProvider.Ollama;
+
+        string formattedMd;
+
+        if (hasApiKey)
+        {
+            try
+            {
+                var prompt = @"Ushbu xom matnni toza, chiroyli va mantiqiy sarlavhalar (#, ##), ro'yxatlar (-), ajratilgan jadvallar (|...|) va kalit so'zlari ajratilgan Obsidian mos Markdown (.md) formatiga aylantirib ber. Ortiqcha izohlarsiz faqat Markdownni qaytar.";
+                var bytes = System.Text.Encoding.UTF8.GetBytes(rawText);
+                var (res, _) = await _aiClient.ConvertWithAiAsync(bytes, "text/plain", "raw_text.txt", aiConfig, prompt);
+                formattedMd = res;
+            }
+            catch
+            {
+                formattedMd = FormatTextHeuristically(rawText);
+            }
+        }
+        else
+        {
+            formattedMd = FormatTextHeuristically(rawText);
+        }
+
+        var docTitle = "Matn_Hujjati_" + DateTime.Now.ToString("HHmmss");
+        var result = new ConversionResult
+        {
+            FileName = docTitle,
+            OriginalFormat = "TEXT",
+            OriginalSizeBytes = System.Text.Encoding.UTF8.GetByteCount(rawText),
+            Markdown = formattedMd,
+            WordCount = MarkItDownEngine.CountWords(formattedMd),
+            CharCount = formattedMd.Length,
+            LineCount = formattedMd.Split('\n').Length,
+            EstimatedTokens = MarkItDownEngine.EstimateTokens(formattedMd),
+            DurationMs = 50,
+            UsedAi = hasApiKey,
+            EngineName = hasApiKey ? $"{aiConfig.Provider} Text Structurer" : "Local Text Formatter",
+            IsSuccess = true
+        };
+
+        ConvertedItems.Insert(0, result);
+        SetActiveResult(result);
+
+        if (TxtStatus != null) TxtStatus.Text = "Matn Markdown formatiga muvaffaqiyatli o'tkazildi!";
+    }
+
+    private static string FormatTextHeuristically(string text)
+    {
+        var sb = new System.Text.StringBuilder();
+        var lines = text.Split('\n');
+
+        sb.AppendLine($"# 📄 Matn Hujjati");
+        sb.AppendLine();
+        sb.AppendLine($"> 📌 **Format:** Markdown | **Tizim:** MarkItDown Local Structurer");
+        sb.AppendLine();
+        sb.AppendLine("---");
+        sb.AppendLine();
+
+        foreach (var originalLine in lines)
+        {
+            var line = originalLine.Trim();
+            if (string.IsNullOrEmpty(line))
+            {
+                sb.AppendLine();
+                continue;
+            }
+
+            // Headings detection
+            if (line.Length < 60 && (line == line.ToUpperInvariant() || !line.EndsWith(".")) && line.Any(char.IsLetter))
+            {
+                sb.AppendLine($"### {line}");
+                sb.AppendLine();
+            }
+            else if (Regex.IsMatch(line, @"^(\d+[\.\)]|\-|\*)\s+"))
+            {
+                sb.AppendLine(line);
+            }
+            else
+            {
+                sb.AppendLine(line);
+            }
+        }
+
+        return sb.ToString().Trim();
     }
 
     // Title Bar Drag & Window Controls
@@ -309,7 +503,7 @@ public partial class MainWindow : Window
 
     private void ApplyTheme(string theme)
     {
-        if (MainBorder == null || TitleBarBorder == null || DropArea == null || EditorContainerBorder == null)
+        if (MainBorder == null || TitleBarBorder == null || PnlDropZoneMode == null || EditorContainerBorder == null)
             return;
 
         switch (theme)
@@ -319,8 +513,8 @@ public partial class MainWindow : Window
                 MainBorder.BorderBrush = new SolidColorBrush(Color.FromRgb(50, 50, 50));
                 TitleBarBorder.Background = new SolidColorBrush(Color.FromRgb(28, 28, 28));
                 if (SettingsBarBorder != null) SettingsBarBorder.Background = new SolidColorBrush(Color.FromRgb(24, 24, 24));
-                DropArea.Background = new SolidColorBrush(Color.FromRgb(30, 30, 30));
-                DropArea.BorderBrush = new SolidColorBrush(Color.FromRgb(168, 85, 247));
+                PnlDropZoneMode.Background = new SolidColorBrush(Color.FromRgb(30, 30, 30));
+                PnlDropZoneMode.BorderBrush = new SolidColorBrush(Color.FromRgb(168, 85, 247));
                 if (DropIconBadge != null) DropIconBadge.Background = new SolidColorBrush(Color.FromRgb(88, 28, 135));
                 if (LogoBadge != null) LogoBadge.Background = new SolidColorBrush(Color.FromRgb(168, 85, 247));
                 EditorContainerBorder.Background = new SolidColorBrush(Color.FromRgb(24, 24, 24));
@@ -338,8 +532,8 @@ public partial class MainWindow : Window
                 MainBorder.BorderBrush = new SolidColorBrush(Color.FromRgb(6, 182, 212));
                 TitleBarBorder.Background = new SolidColorBrush(Color.FromRgb(10, 15, 30));
                 if (SettingsBarBorder != null) SettingsBarBorder.Background = new SolidColorBrush(Color.FromRgb(8, 12, 24));
-                DropArea.Background = new SolidColorBrush(Color.FromRgb(15, 23, 42));
-                DropArea.BorderBrush = new SolidColorBrush(Color.FromRgb(6, 182, 212));
+                PnlDropZoneMode.Background = new SolidColorBrush(Color.FromRgb(15, 23, 42));
+                PnlDropZoneMode.BorderBrush = new SolidColorBrush(Color.FromRgb(6, 182, 212));
                 if (DropIconBadge != null) DropIconBadge.Background = new SolidColorBrush(Color.FromRgb(8, 145, 178));
                 if (LogoBadge != null) LogoBadge.Background = new SolidColorBrush(Color.FromRgb(6, 182, 212));
                 EditorContainerBorder.Background = new SolidColorBrush(Color.FromRgb(15, 23, 42));
@@ -357,8 +551,8 @@ public partial class MainWindow : Window
                 MainBorder.BorderBrush = new SolidColorBrush(Color.FromRgb(203, 213, 225));
                 TitleBarBorder.Background = new SolidColorBrush(Color.FromRgb(255, 255, 255));
                 if (SettingsBarBorder != null) SettingsBarBorder.Background = new SolidColorBrush(Color.FromRgb(248, 250, 252));
-                DropArea.Background = new SolidColorBrush(Color.FromRgb(255, 255, 255));
-                DropArea.BorderBrush = new SolidColorBrush(Color.FromRgb(59, 130, 246));
+                PnlDropZoneMode.Background = new SolidColorBrush(Color.FromRgb(255, 255, 255));
+                PnlDropZoneMode.BorderBrush = new SolidColorBrush(Color.FromRgb(59, 130, 246));
                 if (DropIconBadge != null) DropIconBadge.Background = new SolidColorBrush(Color.FromRgb(219, 234, 254));
                 if (LogoBadge != null) LogoBadge.Background = new SolidColorBrush(Color.FromRgb(59, 130, 246));
                 EditorContainerBorder.Background = new SolidColorBrush(Color.FromRgb(255, 255, 255));
@@ -379,8 +573,8 @@ public partial class MainWindow : Window
                 MainBorder.BorderBrush = new SolidColorBrush(Color.FromRgb(51, 65, 85));
                 TitleBarBorder.Background = new SolidColorBrush(Color.FromRgb(30, 41, 59));
                 if (SettingsBarBorder != null) SettingsBarBorder.Background = new SolidColorBrush(Color.FromRgb(22, 32, 50));
-                DropArea.Background = new SolidColorBrush(Color.FromRgb(30, 41, 59));
-                DropArea.BorderBrush = new SolidColorBrush(Color.FromRgb(99, 102, 241));
+                PnlDropZoneMode.Background = new SolidColorBrush(Color.FromRgb(30, 41, 59));
+                PnlDropZoneMode.BorderBrush = new SolidColorBrush(Color.FromRgb(99, 102, 241));
                 if (DropIconBadge != null) DropIconBadge.Background = new SolidColorBrush(Color.FromRgb(49, 46, 129));
                 if (LogoBadge != null) LogoBadge.Background = new SolidColorBrush(Color.FromRgb(99, 102, 241));
                 EditorContainerBorder.Background = new SolidColorBrush(Color.FromRgb(30, 41, 59));
@@ -548,17 +742,17 @@ public partial class MainWindow : Window
     // Drag and Drop
     private void DropArea_DragEnter(object sender, DragEventArgs e)
     {
-        if (e.Data.GetDataPresent(DataFormats.FileDrop) && DropArea != null)
+        if (e.Data.GetDataPresent(DataFormats.FileDrop) && PnlDropZoneMode != null)
         {
-            DropArea.BorderBrush = new SolidColorBrush(Color.FromRgb(129, 140, 248));
+            PnlDropZoneMode.BorderBrush = new SolidColorBrush(Color.FromRgb(129, 140, 248));
         }
     }
 
     private void DropArea_DragLeave(object sender, DragEventArgs e)
     {
-        if (DropArea != null)
+        if (PnlDropZoneMode != null)
         {
-            DropArea.BorderBrush = new SolidColorBrush(Color.FromRgb(99, 102, 241));
+            PnlDropZoneMode.BorderBrush = new SolidColorBrush(Color.FromRgb(99, 102, 241));
         }
     }
 
