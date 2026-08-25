@@ -4,308 +4,352 @@
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         mc:Ignorable="d"
-        Title="MarkItDown Studio .NET"
-        Height="880" Width="1400"
-        MinHeight="680" MinWidth="1020"
+        Title="MarkItDown Studio"
+        Height="880" Width="1420"
+        MinHeight="680" MinWidth="1040"
         WindowStyle="None"
         AllowsTransparency="True"
         Background="Transparent"
         WindowStartupLocation="CenterScreen"
         KeyDown="Window_KeyDown">
 
-    <!-- Outer Window Border with Glowing Glassmorphic Shadow -->
-    <Border x:Name="MainBorder" CornerRadius="16" Background="#0F172A" BorderBrush="#334155" BorderThickness="1.5" Margin="10">
+    <!-- Outer Window Border with Deep Dark Glassmorphism -->
+    <Border x:Name="MainBorder" CornerRadius="16" Background="#050814" BorderBrush="#1E293B" BorderThickness="1.5" Margin="10">
         <Border.Effect>
-            <DropShadowEffect Color="#000000" BlurRadius="28" ShadowDepth="10" Opacity="0.55" />
+            <DropShadowEffect Color="#000000" BlurRadius="32" ShadowDepth="12" Opacity="0.65" />
         </Border.Effect>
 
         <Grid>
             <Grid.RowDefinitions>
-                <RowDefinition Height="46" /> <!-- Custom Title Bar -->
-                <RowDefinition Height="Auto" /> <!-- Multi-Provider AI & Theme Bar -->
-                <RowDefinition Height="*" /> <!-- Studio Workspace -->
-                <RowDefinition Height="36" /> <!-- Footer Status Bar -->
+                <RowDefinition Height="56" /> <!-- Top Header Bar (1:1 Web Header) -->
+                <RowDefinition Height="*" />  <!-- Main 2-Column Studio Workspace -->
             </Grid.RowDefinitions>
 
-            <!-- 1. Custom Title Bar -->
-            <Border x:Name="TitleBarBorder" Grid.Row="0" Background="#1E293B" CornerRadius="15,15,0,0" BorderBrush="#334155" BorderThickness="0,0,0,1" MouseDown="TitleBar_MouseDown">
-                <Grid Margin="14,0,10,0">
+            <!-- 1. Top Header Bar (Matches Web Header 1:1) -->
+            <Border x:Name="TitleBarBorder" Grid.Row="0" Background="#090E1A" CornerRadius="15,15,0,0" BorderBrush="#1E293B" BorderThickness="0,0,0,1" MouseDown="TitleBar_MouseDown">
+                <Grid Margin="16,0,12,0">
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="Auto" />
                         <ColumnDefinition Width="*" />
                         <ColumnDefinition Width="Auto" />
                     </Grid.ColumnDefinitions>
 
-                    <!-- Brand / App Title -->
+                    <!-- Left: Brand Logo & Title -->
                     <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center">
-                        <Border x:Name="LogoBadge" Width="26" Height="26" Background="#6366F1" CornerRadius="7" Margin="0,0,10,0">
-                            <TextBlock Text="MD" Foreground="White" FontWeight="Bold" FontSize="11" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                        <Border x:Name="LogoBadge" Width="32" Height="32" Background="#4F46E5" CornerRadius="10" Margin="0,0,10,0">
+                            <TextBlock Text="📄" FontSize="14" HorizontalAlignment="Center" VerticalAlignment="Center" />
                         </Border>
-                        <TextBlock x:Name="TxtAppTitle" Text="MarkItDown Studio" Foreground="#F8FAFC" FontWeight="Bold" FontSize="14" VerticalAlignment="Center" />
-                        <Border Background="#064E3B" BorderBrush="#059669" BorderThickness="1" CornerRadius="6" Padding="6,2" Margin="10,0,0,0">
-                            <TextBlock x:Name="TxtSubtitleBadge" Text="v0.0.3 • Win+Shift+S OCR" Foreground="#34D399" FontSize="10" FontWeight="SemiBold" />
-                        </Border>
+                        <StackPanel VerticalAlignment="Center">
+                            <StackPanel Orientation="Horizontal">
+                                <TextBlock x:Name="TxtAppTitle" Text="MarkItDown Studio" Foreground="#FFFFFF" FontWeight="Bold" FontSize="14" VerticalAlignment="Center" />
+                                <Border Background="#064E3B" BorderBrush="#059669" BorderThickness="1" CornerRadius="10" Padding="8,1" Margin="8,0,0,0">
+                                    <TextBlock x:Name="TxtSubtitleBadge" Text="Obsidian &amp; Multi-AI" Foreground="#34D399" FontSize="10" FontWeight="SemiBold" />
+                                </Border>
+                            </StackPanel>
+                            <TextBlock Text="Microsoft MarkItDown Web &amp; Desktop" Foreground="#64748B" FontSize="10" Margin="0,1,0,0" />
+                        </StackPanel>
                     </StackPanel>
 
-                    <!-- Language, Theme Switcher & Window Control Buttons -->
+                    <!-- Right: Language, Theme, Formats, API Key & Controls -->
                     <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
-                        <!-- Language Picker -->
-                        <StackPanel Orientation="Horizontal" Margin="0,0,12,0" VerticalAlignment="Center">
-                            <TextBlock x:Name="LblLanguage" Text="🌐 Til:" Foreground="#94A3B8" FontSize="11" VerticalAlignment="Center" Margin="0,0,6,0" />
-                            <ComboBox x:Name="CmbLanguage" Width="115" Height="26" SelectionChanged="CmbLanguage_SelectionChanged"
-                                      Background="#0F172A" Foreground="#F8FAFC" BorderBrush="#334155" FontSize="11" Padding="4,2">
-                                <ComboBoxItem Content="🇺🇿 O'zbekcha" Tag="uz" />
-                                <ComboBoxItem Content="🇬🇧 English" Tag="en" />
-                                <ComboBoxItem Content="🇷🇺 Русский" Tag="ru" />
+                        <!-- Language Switcher -->
+                        <Border Background="#0F172A" BorderBrush="#1E293B" BorderThickness="1" CornerRadius="8" Padding="4,2" Margin="0,0,8,0">
+                            <ComboBox x:Name="CmbLanguage" Width="120" Height="26" SelectionChanged="CmbLanguage_SelectionChanged"
+                                      Background="Transparent" Foreground="#F8FAFC" BorderThickness="0" FontSize="11" Padding="2,1">
+                                <ComboBoxItem Content="🌐 uz O'zbekcha" Tag="uz" />
+                                <ComboBoxItem Content="🌐 en English" Tag="en" />
+                                <ComboBoxItem Content="🌐 ru Русский" Tag="ru" />
                             </ComboBox>
-                        </StackPanel>
+                        </Border>
 
-                        <!-- Theme Picker -->
-                        <StackPanel Orientation="Horizontal" Margin="0,0,16,0" VerticalAlignment="Center">
-                            <TextBlock x:Name="LblTheme" Text="🎨 Mavzu:" Foreground="#94A3B8" FontSize="11" VerticalAlignment="Center" Margin="0,0,6,0" />
+                        <!-- Theme Switcher -->
+                        <Border Background="#0F172A" BorderBrush="#1E293B" BorderThickness="1" CornerRadius="8" Padding="4,2" Margin="0,0,8,0">
                             <ComboBox x:Name="CmbTheme" Width="135" Height="26" SelectionChanged="CmbTheme_SelectionChanged"
-                                      Background="#0F172A" Foreground="#F8FAFC" BorderBrush="#334155" FontSize="11" Padding="4,2">
-                                <ComboBoxItem Content="Midnight Glass" Tag="MidnightGlass" />
-                                <ComboBoxItem Content="Obsidian Dark" Tag="ObsidianDark" />
-                                <ComboBoxItem Content="Cyberpunk Neon" Tag="CyberpunkNeon" />
-                                <ComboBoxItem Content="Frosted Crystal" Tag="FrostedCrystal" />
+                                      Background="Transparent" Foreground="#F8FAFC" BorderThickness="0" FontSize="11" Padding="2,1">
+                                <ComboBoxItem Content="🌌 Midnight Glass" Tag="MidnightGlass" />
+                                <ComboBoxItem Content="🔮 Obsidian Dark" Tag="ObsidianDark" />
+                                <ComboBoxItem Content="⚡ Cyberpunk Neon" Tag="CyberpunkNeon" />
+                                <ComboBoxItem Content="❄️ Frosted Crystal" Tag="FrostedCrystal" />
                             </ComboBox>
-                        </StackPanel>
+                        </Border>
+
+                        <!-- Supported Formats Button -->
+                        <Button x:Name="BtnOpenFormats" Click="BtnOpenFormats_Click" Style="{StaticResource GlassButton}" Margin="0,0,8,0" Padding="10,5" FontSize="11">
+                            <StackPanel Orientation="Horizontal">
+                                <TextBlock Text="🗂" FontSize="11" Margin="0,0,4,0" VerticalAlignment="Center" />
+                                <TextBlock x:Name="TxtFormatsBtnLabel" Text="Formatlar" VerticalAlignment="Center" />
+                            </StackPanel>
+                        </Button>
+
+                        <!-- API Key Button (with amber/yellow border) -->
+                        <Button x:Name="BtnOpenApiKey" Click="BtnOpenApiKey_Click" Margin="0,0,12,0" Padding="12,5" FontSize="11"
+                                Background="#1E1B4B" BorderBrush="#F59E0B" BorderThickness="1" Foreground="#FBBF24" FontWeight="SemiBold" Cursor="Hand">
+                            <Button.Template>
+                                <ControlTemplate TargetType="Button">
+                                    <Border Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="{TemplateBinding BorderThickness}" CornerRadius="8" Padding="{TemplateBinding Padding}">
+                                        <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                    </Border>
+                                </ControlTemplate>
+                            </Button.Template>
+                            <StackPanel Orientation="Horizontal">
+                                <TextBlock Text="🔑" FontSize="11" Margin="0,0,5,0" VerticalAlignment="Center" />
+                                <TextBlock x:Name="TxtApiKeyBtnLabel" Text="API Kalit:" VerticalAlignment="Center" />
+                            </StackPanel>
+                        </Button>
 
                         <!-- Window Buttons -->
-                        <Button Click="BtnMinimize_Click" Style="{StaticResource GlassButton}" Width="32" Height="28" Padding="0" Margin="0,0,4,0" ToolTip="Kichraytirish">
+                        <Button Click="BtnMinimize_Click" Style="{StaticResource GlassButton}" Width="28" Height="26" Padding="0" Margin="0,0,4,0" ToolTip="Kichraytirish">
                             <TextBlock Text="─" Foreground="#94A3B8" FontSize="10" FontWeight="Bold" />
                         </Button>
-                        <Button Click="BtnMaximize_Click" Style="{StaticResource GlassButton}" Width="32" Height="28" Padding="0" Margin="0,0,4,0" ToolTip="Kattalashtirish">
-                            <TextBlock Text="▢" Foreground="#94A3B8" FontSize="11" />
+                        <Button Click="BtnMaximize_Click" Style="{StaticResource GlassButton}" Width="28" Height="26" Padding="0" Margin="0,0,4,0" ToolTip="Kattalashtirish">
+                            <TextBlock Text="▢" Foreground="#94A3B8" FontSize="10" />
                         </Button>
-                        <Button Click="BtnClose_Click" Style="{StaticResource GlassButton}" Width="32" Height="28" Padding="0" ToolTip="Yopish">
+                        <Button Click="BtnClose_Click" Style="{StaticResource GlassButton}" Width="28" Height="26" Padding="0" ToolTip="Yopish">
                             <TextBlock Text="✕" Foreground="#F87171" FontSize="11" FontWeight="Bold" />
                         </Button>
                     </StackPanel>
                 </Grid>
             </Border>
 
-            <!-- 2. AI Settings & Multi-Provider Bar with Dynamic Guide Banner -->
-            <Border x:Name="SettingsBarBorder" Grid.Row="1" Background="#162032" BorderBrush="#334155" BorderThickness="0,0,0,1" Padding="14,10">
-                <StackPanel>
-                    <Grid>
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="*" />
-                            <ColumnDefinition Width="Auto" />
-                        </Grid.ColumnDefinitions>
-
-                        <!-- Left: Provider & Model Selector -->
-                        <WrapPanel Grid.Column="0" VerticalAlignment="Center">
-                            <!-- Provider Selector -->
-                            <StackPanel Orientation="Horizontal" Margin="0,0,14,0" VerticalAlignment="Center">
-                                <TextBlock x:Name="LblAiProvider" Text="AI Provayder:" Foreground="#94A3B8" FontSize="12" VerticalAlignment="Center" Margin="0,0,6,0" />
-                                <ComboBox x:Name="CmbAiProvider" Width="145" Height="30" SelectionChanged="CmbAiProvider_SelectionChanged"
-                                          Background="#0F172A" Foreground="#F8FAFC" BorderBrush="#334155" Padding="6,4">
-                                    <ComboBoxItem Content="Google Gemini" Tag="GoogleGemini" />
-                                    <ComboBoxItem Content="Groq AI (Ultra-Tez)" Tag="GroqAI" />
-                                    <ComboBoxItem Content="OpenAI" Tag="OpenAI" />
-                                    <ComboBoxItem Content="Anthropic Claude" Tag="AnthropicClaude" />
-                                    <ComboBoxItem Content="DeepSeek" Tag="DeepSeek" />
-                                    <ComboBoxItem Content="Ollama (Lokal)" Tag="Ollama" />
-                                    <ComboBoxItem Content="Custom Endpoint" Tag="CustomOpenAICompatible" />
-                                </ComboBox>
-                            </StackPanel>
-
-                            <!-- Model Name -->
-                            <StackPanel Orientation="Horizontal" Margin="0,0,14,0" VerticalAlignment="Center">
-                                <TextBlock x:Name="LblModel" Text="Model:" Foreground="#94A3B8" FontSize="12" VerticalAlignment="Center" Margin="0,0,6,0" />
-                                <ComboBox x:Name="CmbModelName" Width="200" Height="30" IsEditable="True"
-                                          Background="#0F172A" Foreground="#F8FAFC" BorderBrush="#334155" Padding="6,4"
-                                          LostFocus="CmbModelName_LostFocus" />
-                            </StackPanel>
-
-                            <!-- API Key -->
-                            <StackPanel Orientation="Horizontal" Margin="0,0,14,0" VerticalAlignment="Center">
-                                <TextBlock x:Name="LblApiKey" Text="API Kalit:" Foreground="#94A3B8" FontSize="12" VerticalAlignment="Center" Margin="0,0,6,0" />
-                                <PasswordBox x:Name="TxtApiKey" Width="185" Height="30" PasswordChar="●"
-                                             Background="#0F172A" Foreground="#F8FAFC" BorderBrush="#334155" Padding="6,4" VerticalContentAlignment="Center"
-                                             PasswordChanged="TxtApiKey_PasswordChanged" />
-                            </StackPanel>
-
-                            <!-- Custom URL (for Ollama/Custom) -->
-                            <StackPanel x:Name="PnlCustomBaseUrl" Orientation="Horizontal" Margin="0,0,14,0" VerticalAlignment="Center" Visibility="Collapsed">
-                                <TextBlock Text="Base URL:" Foreground="#94A3B8" FontSize="12" VerticalAlignment="Center" Margin="0,0,6,0" />
-                                <TextBox x:Name="TxtCustomBaseUrl" Width="175" Height="30" Text="http://localhost:11434" Style="{StaticResource GlassTextBox}"
-                                         LostFocus="TxtCustomBaseUrl_LostFocus" />
-                            </StackPanel>
-                        </WrapPanel>
-
-                        <!-- Right: Save / Status Indicators -->
-                        <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
-                            <TextBlock x:Name="TxtKeyStatus" Text="🔒 Kalit saqlandi" Foreground="#10B981" FontSize="11" VerticalAlignment="Center" Margin="0,0,12,0" />
-                            <CheckBox x:Name="ChkEnableAi" Content="AI Vision OCR" Foreground="#F8FAFC" FontSize="12" VerticalAlignment="Center" IsChecked="True" Checked="ChkEnableAi_Changed" Unchecked="ChkEnableAi_Changed" />
-                        </StackPanel>
-                    </Grid>
-
-                    <!-- Contextual API Key Guide Banner (Shown when API key is empty) -->
-                    <Border x:Name="PnlKeyGuide" Background="#0C1A2E" BorderBrush="#1D4ED8" BorderThickness="1" CornerRadius="8" Padding="10,6" Margin="0,8,0,0" Visibility="Visible">
-                        <TextBlock x:Name="TxtKeyGuide" Text="💡 Google AI Studio (aistudio.google.com/app/apikey) ga kiring va 1 daqiqada 100% bepul API kalit oling."
-                                   Foreground="#93C5FD" FontSize="11" VerticalAlignment="Center" />
-                    </Border>
-                </StackPanel>
-            </Border>
-
-            <!-- 3. Main Workspace Grid -->
-            <Grid Grid.Row="2" Margin="14">
+            <!-- 2. Main Studio Workspace (Left & Right 1:1 Layout) -->
+            <Grid Grid.Row="1" Margin="16">
                 <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="420" MinWidth="300" MaxWidth="560" />
-                    <ColumnDefinition Width="12" />
+                    <ColumnDefinition Width="460" MinWidth="340" MaxWidth="600" />
+                    <ColumnDefinition Width="14" />
                     <ColumnDefinition Width="*" />
                 </Grid.ColumnDefinitions>
 
-                <!-- LEFT PANEL: Multi-Mode Input (Files, Web URL, Raw Text / Win+Shift+S) & History -->
+                <!-- LEFT COLUMN: Tabs, DropZone & Selected Files Queue -->
                 <Grid Grid.Column="0">
                     <Grid.RowDefinitions>
-                        <RowDefinition Height="Auto" /> <!-- Tab Buttons -->
-                        <RowDefinition Height="Auto" /> <!-- Active Input Area -->
-                        <RowDefinition Height="*" />    <!-- Converted Items List -->
+                        <RowDefinition Height="Auto" /> <!-- Tabs -->
+                        <RowDefinition Height="*" />    <!-- Content Area (DropZone / URL / Queue) -->
                     </Grid.RowDefinitions>
 
-                    <!-- Input Mode Tabs -->
-                    <Grid Grid.Row="0" Margin="0,0,0,10">
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="*" />
-                            <ColumnDefinition Width="*" />
-                            <ColumnDefinition Width="*" />
-                        </Grid.ColumnDefinitions>
-                        <Button x:Name="BtnTabFiles" Grid.Column="0" Click="BtnTabFiles_Click" Style="{StaticResource AccentButton}" Content="📁 Fayllar" Margin="0,0,4,0" Padding="6,5" FontSize="11" />
-                        <Button x:Name="BtnTabUrl" Grid.Column="1" Click="BtnTabUrl_Click" Style="{StaticResource GlassButton}" Content="🌐 Web URL" Margin="2,0,2,0" Padding="6,5" FontSize="11" />
-                        <Button x:Name="BtnTabText" Grid.Column="2" Click="BtnTabText_Click" Style="{StaticResource GlassButton}" Content="📝 Matn / Bufer" Margin="4,0,0,0" Padding="6,5" FontSize="11" ToolTip="Win+Shift+S skrinshotini yoki xom matnni to'g'ridan-to'g'ri o'girish" />
-                    </Grid>
-
-                    <!-- Active Input Container -->
-                    <Grid Grid.Row="1" Margin="0,0,0,12">
-                        <!-- Mode 1: File Drop Zone -->
-                        <Border x:Name="PnlDropZoneMode" Visibility="Visible"
-                                Background="#1E293B" BorderBrush="#6366F1" BorderThickness="2" CornerRadius="12"
-                                Padding="16"
-                                AllowDrop="True" Drop="DropArea_Drop" DragEnter="DropArea_DragEnter" DragLeave="DropArea_DragLeave"
-                                Cursor="Hand" MouseLeftButtonDown="BtnSelectFile_Click">
-                            <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
-                                <Border x:Name="DropIconBadge" Width="40" Height="40" Background="#312E81" CornerRadius="20" HorizontalAlignment="Center" Margin="0,0,0,6">
-                                    <TextBlock Text="📁" FontSize="18" HorizontalAlignment="Center" VerticalAlignment="Center" />
-                                </Border>
-                                <TextBlock x:Name="TxtDropTitle" Text="Faylni bu yerga tashlang" Foreground="#F8FAFC" FontWeight="Bold" FontSize="12" HorizontalAlignment="Center" />
-                                <TextBlock x:Name="TxtDropSubtitle" Text="PDF, Word, Excel, PPTX, Rasm (OCR), Audio, ZIP, Kod" Foreground="#94A3B8" FontSize="10" TextWrapping="Wrap" TextAlignment="Center" Margin="0,2,0,8" />
-                                <Button x:Name="BtnSelectFile" Click="BtnSelectFile_Click" Style="{StaticResource AccentButton}" Content="Fayl Tanlash..." HorizontalAlignment="Center" Padding="14,4" FontSize="11" />
-                            </StackPanel>
-                        </Border>
-
-                        <!-- Mode 2: Web URL Converter Box -->
-                        <Border x:Name="PnlUrlMode" Visibility="Collapsed"
-                                Background="#1E293B" BorderBrush="#334155" BorderThickness="1" CornerRadius="10" Padding="12">
-                            <StackPanel>
-                                <TextBlock Text="🌐 Web Havolani Markdown ga O'tkazish:" Foreground="#94A3B8" FontSize="11" Margin="0,0,0,6" />
-                                <TextBox x:Name="TxtWebUrl" Style="{StaticResource GlassTextBox}" Margin="0,0,0,8"
-                                         Text="https://uz.wikipedia.org/wiki/Markdown" Foreground="#F8FAFC" FontSize="12" />
-                                <Button x:Name="BtnConvertUrl" Click="BtnConvertUrl_Click" Style="{StaticResource AccentButton}" Content="🌐 URL ni Markdown ga Aylantirish" Padding="12,6" FontSize="11" HorizontalAlignment="Stretch" />
-                            </StackPanel>
-                        </Border>
-
-                        <!-- Mode 3: Raw Text & Win+Shift+S Clipboard OCR Box -->
-                        <Border x:Name="PnlRawTextMode" Visibility="Collapsed"
-                                Background="#1E293B" BorderBrush="#6366F1" BorderThickness="1.5" CornerRadius="10" Padding="12">
-                            <StackPanel>
-                                <Grid Margin="0,0,0,6">
-                                    <TextBlock x:Name="LblRawTextTitle" Text="📝 Xom Matn yoki Skrinshot (Win+Shift+S):" Foreground="#F8FAFC" FontWeight="SemiBold" FontSize="11" VerticalAlignment="Center" />
-                                    <Button Click="BtnPasteFromClipboard_Click" HorizontalAlignment="Right" Style="{StaticResource GlassButton}" Content="📋 Buferdan Qo'yish (Ctrl+V)" Padding="8,2" FontSize="10" ToolTip="Win+Shift+S orqali olingan skrinshot yoki matnni avtomatik oladi" />
-                                </Grid>
-
-                                <TextBox x:Name="TxtRawInput" Height="90" Style="{StaticResource GlassTextBox}"
-                                         AcceptsReturn="True" TextWrapping="Wrap" VerticalScrollBarVisibility="Auto"
-                                         Background="#0B1120" Foreground="#E2E8F0" FontSize="11" Margin="0,0,0,8"
-                                         Text="Bu yerga xohlagan xom matnni yozing yoki Win+Shift+S orqali rasm oling..." />
-
-                                <Button x:Name="BtnConvertRawText" Click="BtnConvertRawText_Click" Style="{StaticResource AccentButton}" Content="✨ Matnni Markdown (.md) ga O'tkazish" Padding="14,7" FontSize="12" FontWeight="Bold" HorizontalAlignment="Stretch" />
-                            </StackPanel>
-                        </Border>
-                    </Grid>
-
-                    <!-- Converted Items History with Individual Delete and Clear All -->
-                    <Border x:Name="HistoryBoxBorder" Grid.Row="2" Background="#1E293B" BorderBrush="#334155" BorderThickness="1" CornerRadius="10" Padding="10">
+                    <!-- Top Tabs -->
+                    <Border Grid.Row="0" Background="#0C1322" BorderBrush="#1E293B" BorderThickness="1" CornerRadius="12" Padding="4" Margin="0,0,0,12">
                         <Grid>
-                            <Grid.RowDefinitions>
-                                <RowDefinition Height="Auto" />
-                                <RowDefinition Height="*" />
-                            </Grid.RowDefinitions>
-                            <Grid Grid.Row="0" Margin="0,0,0,8">
-                                <TextBlock x:Name="TxtHistoryTitle" Text="O'girilgan Hujjatlar" Foreground="#F8FAFC" FontWeight="SemiBold" FontSize="12" VerticalAlignment="Center" />
-                                <Button x:Name="BtnClearAll" Click="BtnClearHistory_Click" HorizontalAlignment="Right" Style="{StaticResource GlassButton}" Content="🗑️ Barchasini Tozalash" Padding="8,3" FontSize="10" />
-                            </Grid>
-                            <ListBox x:Name="LstConvertedItems" Grid.Row="1" Background="Transparent" BorderThickness="0"
-                                     SelectionChanged="LstConvertedItems_SelectionChanged" ScrollViewer.HorizontalScrollBarVisibility="Disabled">
-                                <ListBox.ItemTemplate>
-                                    <DataTemplate>
-                                        <Border Background="#0F172A" BorderBrush="#334155" BorderThickness="1" CornerRadius="8" Padding="8" Margin="0,0,0,6">
-                                            <Grid>
-                                                <Grid.ColumnDefinitions>
-                                                    <ColumnDefinition Width="*" />
-                                                    <ColumnDefinition Width="Auto" />
-                                                    <ColumnDefinition Width="Auto" />
-                                                </Grid.ColumnDefinitions>
-                                                <StackPanel Grid.Column="0" VerticalAlignment="Center">
-                                                    <TextBlock Text="{Binding FileName}" Foreground="#F8FAFC" FontWeight="SemiBold" FontSize="12" TextTrimming="CharacterEllipsis" />
-                                                    <TextBlock Foreground="#94A3B8" FontSize="10" Margin="0,2,0,0">
-                                                        <Run Text="{Binding WordCount}" /> <Run Text="so'z •" /> <Run Text="{Binding DurationMs}" /> <Run Text="ms" />
-                                                    </TextBlock>
-                                                </StackPanel>
-                                                <Border Grid.Column="1" Background="#312E81" CornerRadius="4" Padding="5,2" VerticalAlignment="Center" Margin="0,0,6,0">
-                                                    <TextBlock Text="{Binding OriginalFormat}" Foreground="#A5B4FC" FontSize="9" FontWeight="Bold" />
-                                                </Border>
-                                                <!-- Single item delete button -->
-                                                <Button Grid.Column="2" Tag="{Binding}" Click="BtnDeleteSingleItem_Click" Style="{StaticResource GlassButton}" Padding="4,2" ToolTip="Ushbu faylni o'chirish">
-                                                    <TextBlock Text="✕" Foreground="#F87171" FontSize="10" FontWeight="Bold" />
-                                                </Button>
-                                            </Grid>
-                                        </Border>
-                                    </DataTemplate>
-                                </ListBox.ItemTemplate>
-                            </ListBox>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
+                            <Button x:Name="BtnTabUpload" Grid.Column="0" Click="BtnTabUpload_Click" Style="{StaticResource AccentButton}" Content="📁 Faylni bu yerga tashlang" Padding="10,8" FontSize="11" FontWeight="SemiBold" Margin="0,0,2,0" />
+                            <Button x:Name="BtnTabUrl" Grid.Column="1" Click="BtnTabUrl_Click" Style="{StaticResource GlassButton}" Content="🌐 Web URL" Padding="10,8" FontSize="11" Margin="2,0,0,0" />
                         </Grid>
                     </Border>
+
+                    <!-- Left Content Area (DropZone + Queue) -->
+                    <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+                        <StackPanel>
+                            <!-- Mode 1: File Drop Zone -->
+                            <StackPanel x:Name="PnlUploadMode" Visibility="Visible">
+                                <!-- Drop Box Area -->
+                                <Border x:Name="DropArea"
+                                        Background="#0A101D" BorderBrush="#312E81" BorderThickness="2" CornerRadius="16"
+                                        Padding="24,20" Margin="0,0,0,12"
+                                        AllowDrop="True" Drop="DropArea_Drop" DragEnter="DropArea_DragEnter" DragLeave="DropArea_DragLeave"
+                                        Cursor="Hand" MouseLeftButtonDown="BtnSelectFile_Click">
+                                    <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
+                                        <Border x:Name="DropIconBadge" Width="52" Height="52" Background="#1E1B4B" CornerRadius="16" BorderBrush="#4338CA" BorderThickness="1" HorizontalAlignment="Center" Margin="0,0,0,10">
+                                            <TextBlock Text="☁" Foreground="#818CF8" FontSize="24" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                        </Border>
+                                        <TextBlock TextAlignment="Center">
+                                            <Run x:Name="TxtDropTitle1" Text="Faylni bu yerga tashlang yoki " Foreground="#FFFFFF" FontWeight="Bold" FontSize="13" />
+                                            <Run x:Name="TxtDropTitle2" Text="Fayl Tanlash..." Foreground="#6366F1" TextDecorations="Underline" FontWeight="Bold" FontSize="13" />
+                                        </TextBlock>
+                                        <TextBlock x:Name="TxtDropSubtitle" Text="PDF, Word, Excel, PPTX, Rasm (OCR), Audio, ZIP, Kod" Foreground="#64748B" FontSize="11" TextWrapping="Wrap" TextAlignment="Center" Margin="0,4,0,12" />
+
+                                        <!-- Format Badges -->
+                                        <WrapPanel HorizontalAlignment="Center" Margin="0,0,0,0">
+                                            <Border Background="#1E293B" CornerRadius="6" Padding="6,2" Margin="2">
+                                                <TextBlock Text="PDF" Foreground="#94A3B8" FontSize="9" FontWeight="SemiBold" />
+                                            </Border>
+                                            <Border Background="#1E293B" CornerRadius="6" Padding="6,2" Margin="2">
+                                                <TextBlock Text="Word (.docx)" Foreground="#94A3B8" FontSize="9" FontWeight="SemiBold" />
+                                            </Border>
+                                            <Border Background="#1E293B" CornerRadius="6" Padding="6,2" Margin="2">
+                                                <TextBlock Text="Excel (.xlsx)" Foreground="#94A3B8" FontSize="9" FontWeight="SemiBold" />
+                                            </Border>
+                                            <Border Background="#1E293B" CornerRadius="6" Padding="6,2" Margin="2">
+                                                <TextBlock Text="PowerPoint" Foreground="#94A3B8" FontSize="9" FontWeight="SemiBold" />
+                                            </Border>
+                                            <Border Background="#1E293B" CornerRadius="6" Padding="6,2" Margin="2">
+                                                <TextBlock Text="CSV/TSV" Foreground="#94A3B8" FontSize="9" FontWeight="SemiBold" />
+                                            </Border>
+                                            <Border Background="#1E293B" CornerRadius="6" Padding="6,2" Margin="2">
+                                                <TextBlock Text="JSON" Foreground="#94A3B8" FontSize="9" FontWeight="SemiBold" />
+                                            </Border>
+                                            <Border Background="#1E293B" CornerRadius="6" Padding="6,2" Margin="2">
+                                                <TextBlock Text="Rasmlar (OCR)" Foreground="#94A3B8" FontSize="9" FontWeight="SemiBold" />
+                                            </Border>
+                                            <Border Background="#1E293B" CornerRadius="6" Padding="6,2" Margin="2">
+                                                <TextBlock Text="Audio Ovoz" Foreground="#94A3B8" FontSize="9" FontWeight="SemiBold" />
+                                            </Border>
+                                            <Border Background="#1E293B" CornerRadius="6" Padding="6,2" Margin="2">
+                                                <TextBlock Text="ZIP" Foreground="#94A3B8" FontSize="9" FontWeight="SemiBold" />
+                                            </Border>
+                                        </WrapPanel>
+                                    </StackPanel>
+                                </Border>
+
+                                <!-- Selected Files Queue (1:1 with Web DropZone Queue) -->
+                                <Border x:Name="PnlSelectedFilesQueue" Background="#0A101D" BorderBrush="#1E293B" BorderThickness="1" CornerRadius="16" Padding="14" Visibility="Collapsed">
+                                    <StackPanel>
+                                        <!-- Header Row: Count & Clear All -->
+                                        <Grid Margin="0,0,0,10">
+                                            <TextBlock x:Name="TxtQueueSummary" Text="Tanlangan (0) Jami: 0 B" Foreground="#FFFFFF" FontWeight="Bold" FontSize="12" VerticalAlignment="Center" />
+                                            <Button Click="BtnClearSelectedQueue_Click" HorizontalAlignment="Right" Style="{StaticResource GlassButton}" Content="Barchasini Tozalash" Padding="8,2" FontSize="11" Foreground="#94A3B8" />
+                                        </Grid>
+
+                                        <!-- Selected Files List -->
+                                        <ListBox x:Name="LstSelectedFilesQueue" MaxHeight="180" Background="Transparent" BorderThickness="0" ScrollViewer.HorizontalScrollBarVisibility="Disabled" Margin="0,0,0,12">
+                                            <ListBox.ItemTemplate>
+                                                <DataTemplate>
+                                                    <Border Background="#0F172A" BorderBrush="#1E293B" BorderThickness="1" CornerRadius="8" Padding="10,6" Margin="0,0,0,6">
+                                                        <Grid>
+                                                            <Grid.ColumnDefinitions>
+                                                                <ColumnDefinition Width="Auto" />
+                                                                <ColumnDefinition Width="*" />
+                                                                <ColumnDefinition Width="Auto" />
+                                                            </Grid.ColumnDefinitions>
+                                                            <!-- Format Icon Badge -->
+                                                            <TextBlock Grid.Column="0" Text="📄" FontSize="13" VerticalAlignment="Center" Margin="0,0,8,0" />
+                                                            <!-- File name & Size -->
+                                                            <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                                                                <TextBlock Text="{Binding FileName}" Foreground="#F8FAFC" FontSize="12" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
+                                                                <TextBlock Text="{Binding FileSizeText}" Foreground="#64748B" FontSize="10" />
+                                                            </StackPanel>
+                                                            <!-- Remove Button -->
+                                                            <Button Grid.Column="2" Tag="{Binding}" Click="BtnRemoveFromQueue_Click" Style="{StaticResource GlassButton}" Padding="6,2" ToolTip="O'chirish">
+                                                                <TextBlock Text="✕" Foreground="#94A3B8" FontSize="10" />
+                                                            </Button>
+                                                        </Grid>
+                                                    </Border>
+                                                </DataTemplate>
+                                            </ListBox.ItemTemplate>
+                                        </ListBox>
+
+                                        <!-- Bottom Action Row: Ready Status & Big Convert Button -->
+                                        <Grid VerticalAlignment="Center">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="*" />
+                                                <ColumnDefinition Width="Auto" />
+                                            </Grid.ColumnDefinitions>
+                                            <TextBlock x:Name="TxtQueueReadyStatus" Text="0 ta fayl .md formatiga o'tkazishga tayyor" Foreground="#64748B" FontSize="11" VerticalAlignment="Center" TextWrapping="Wrap" />
+                                            <Button x:Name="BtnStartConvertFiles" Grid.Column="1" Click="BtnStartConvertFiles_Click" Style="{StaticResource AccentButton}" Padding="16,10" FontSize="12" FontWeight="Bold">
+                                                <StackPanel Orientation="Horizontal">
+                                                    <TextBlock Text="✨" FontSize="13" Margin="0,0,6,0" VerticalAlignment="Center" />
+                                                    <TextBlock Text="Matnni Markdown (.md) ga O'tkazish" VerticalAlignment="Center" />
+                                                </StackPanel>
+                                            </Button>
+                                        </Grid>
+                                    </StackPanel>
+                                </Border>
+                            </StackPanel>
+
+                            <!-- Mode 2: Web URL Converter Box -->
+                            <Border x:Name="PnlUrlMode" Background="#0A101D" BorderBrush="#1E293B" BorderThickness="1" CornerRadius="16" Padding="16" Visibility="Collapsed">
+                                <StackPanel>
+                                    <TextBlock Text="🌐 Web Havolani Markdown ga O'tkazish:" Foreground="#94A3B8" FontSize="12" Margin="0,0,0,8" />
+                                    <TextBox x:Name="TxtWebUrl" Style="{StaticResource GlassTextBox}" Margin="0,0,0,10"
+                                             Text="https://uz.wikipedia.org/wiki/Markdown" Foreground="#F8FAFC" FontSize="12" />
+                                    <Button x:Name="BtnConvertUrl" Click="BtnConvertUrl_Click" Style="{StaticResource AccentButton}" Content="🌐 URL ni Markdown ga Aylantirish" Padding="14,8" FontSize="12" FontWeight="Bold" HorizontalAlignment="Stretch" />
+                                </StackPanel>
+                            </Border>
+                        </StackPanel>
+                    </ScrollViewer>
                 </Grid>
 
                 <!-- Grid Splitter -->
-                <GridSplitter Grid.Column="1" Width="4" HorizontalAlignment="Center" Background="#334155" Cursor="SizeWE" />
+                <GridSplitter Grid.Column="1" Width="4" HorizontalAlignment="Center" Background="#1E293B" Cursor="SizeWE" />
 
-                <!-- RIGHT PANEL: Markdown Viewer & Editor -->
-                <Border x:Name="EditorContainerBorder" Grid.Column="2" Background="#1E293B" BorderBrush="#334155" BorderThickness="1" CornerRadius="12" Padding="14">
+                <!-- RIGHT COLUMN: Document Tabs, Toolbar, Stats & Markdown Editor (1:1 with Web) -->
+                <Border x:Name="EditorContainerBorder" Grid.Column="2" Background="#0A101D" BorderBrush="#1E293B" BorderThickness="1" CornerRadius="16" Padding="16">
                     <Grid>
                         <Grid.RowDefinitions>
-                            <RowDefinition Height="Auto" /> <!-- Doc Header & Action Toolbar -->
-                            <RowDefinition Height="*" />    <!-- Markdown Content Editor -->
+                            <RowDefinition Height="Auto" /> <!-- Document Tabs Strip -->
+                            <RowDefinition Height="Auto" /> <!-- Toolbar Strip (View Mode & Actions) -->
+                            <RowDefinition Height="Auto" /> <!-- Stats Strip -->
+                            <RowDefinition Height="*" />    <!-- Editor Inner Border -->
                         </Grid.RowDefinitions>
 
-                        <!-- Header & Actions -->
+                        <!-- 1. Document Tabs Strip -->
                         <Grid Grid.Row="0" Margin="0,0,0,12">
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="*" />
                                 <ColumnDefinition Width="Auto" />
                             </Grid.ColumnDefinitions>
 
-                            <StackPanel Grid.Column="0" VerticalAlignment="Center">
-                                <TextBlock x:Name="TxtDocTitle" Text="MarkItDown Studio .NET" Foreground="#F8FAFC" FontWeight="Bold" FontSize="15" />
-                                <TextBlock x:Name="TxtDocStats" Text="Obsidian va Markdown uchun toza, tartibli formatlash" Foreground="#94A3B8" FontSize="11" Margin="0,2,0,0" />
-                            </StackPanel>
+                            <!-- Converted Documents Tabs List -->
+                            <ScrollViewer Grid.Column="0" HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Disabled">
+                                <ListBox x:Name="LstConvertedItems" Background="Transparent" BorderThickness="0"
+                                         SelectionChanged="LstConvertedItems_SelectionChanged" ScrollViewer.HorizontalScrollBarVisibility="Disabled">
+                                    <ListBox.ItemsPanel>
+                                        <ItemsPanelTemplate>
+                                            <VirtualizingStackPanel Orientation="Horizontal" />
+                                        </ItemsPanelTemplate>
+                                    </ListBox.ItemsPanel>
+                                    <ListBox.ItemTemplate>
+                                        <DataTemplate>
+                                            <Border Background="#4338CA" BorderBrush="#6366F1" BorderThickness="1" CornerRadius="8" Padding="10,5" Margin="0,0,6,0">
+                                                <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                                    <TextBlock Text="{Binding FileName}" Foreground="#FFFFFF" FontWeight="Bold" FontSize="12" Margin="0,0,6,0" VerticalAlignment="Center" />
+                                                    <Border Background="#312E81" CornerRadius="4" Padding="4,1" Margin="0,0,6,0" VerticalAlignment="Center">
+                                                        <TextBlock Text="{Binding OriginalFormat}" Foreground="#A5B4FC" FontSize="9" FontWeight="Bold" />
+                                                    </Border>
+                                                    <Button Tag="{Binding}" Click="BtnDeleteSingleItem_Click" Style="{StaticResource GlassButton}" Padding="3,0" VerticalAlignment="Center">
+                                                        <TextBlock Text="✕" Foreground="#CBD5E1" FontSize="10" />
+                                                    </Button>
+                                                </StackPanel>
+                                            </Border>
+                                        </DataTemplate>
+                                    </ListBox.ItemTemplate>
+                                </ListBox>
+                            </ScrollViewer>
 
-                            <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
-                                <!-- AI Proofreader & Fixer Button -->
-                                <Button x:Name="BtnAiProofread" Click="BtnAiProofread_Click" Style="{StaticResource GlassButton}" Content="✨ AI Bilan Tekshirish" Margin="0,0,8,0" Padding="10,6" FontSize="12" ToolTip="Grammatika, jadvallar va format xatoliklarini AI orqali tekshirish" />
-                                <Button x:Name="BtnCopyMarkdown" Click="BtnCopyMarkdown_Click" Style="{StaticResource GlassButton}" Content="📋 Nusxalash" Margin="0,0,8,0" Padding="12,6" FontSize="12" />
-                                <Button x:Name="BtnSaveMarkdown" Click="BtnSaveMarkdown_Click" Style="{StaticResource AccentButton}" Content="💾 .md Saqlash" Padding="14,6" FontSize="12" />
+                            <!-- Clear History Button -->
+                            <Button x:Name="BtnClearAll" Grid.Column="1" Click="BtnClearHistory_Click" Style="{StaticResource GlassButton}" Content="🗑️ Tozalash" Padding="10,5" FontSize="11" VerticalAlignment="Center" />
+                        </Grid>
+
+                        <!-- 2. Toolbar Strip: View Mode & Action Buttons -->
+                        <Grid Grid.Row="1" Margin="0,0,0,12">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+
+                            <!-- Left: Split / Preview / Editor View Toggles -->
+                            <Border Grid.Column="0" Background="#0F172A" BorderBrush="#1E293B" BorderThickness="1" CornerRadius="8" Padding="2">
+                                <StackPanel Orientation="Horizontal">
+                                    <Button Style="{StaticResource GlassButton}" Content="◫ Split" Padding="8,4" FontSize="11" Margin="0,0,2,0" />
+                                    <Button Style="{StaticResource GlassButton}" Content="👁 Preview" Padding="8,4" FontSize="11" Margin="0,0,2,0" />
+                                    <Button Style="{StaticResource AccentButton}" Content="✏️ Editor" Padding="10,4" FontSize="11" FontWeight="SemiBold" />
+                                </StackPanel>
+                            </Border>
+
+                            <!-- Right: AI Proofread, Copy, Save .md -->
+                            <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
+                                <Button x:Name="BtnAiProofread" Click="BtnAiProofread_Click" Style="{StaticResource GlassButton}" Content="✨ AI Bilan Tekshirish" Margin="0,0,8,0" Padding="12,6" FontSize="11" ToolTip="Grammatika, jadvallar va format xatoliklarini AI orqali tekshirish" />
+                                <Button x:Name="BtnCopyMarkdown" Click="BtnCopyMarkdown_Click" Style="{StaticResource GlassButton}" Content="📋 Nusxa olish" Margin="0,0,8,0" Padding="12,6" FontSize="11" />
+                                <Button x:Name="BtnSaveMarkdown" Click="BtnSaveMarkdown_Click" Style="{StaticResource AccentButton}" Content="💾 .md Saqlash" Padding="14,6" FontSize="11" FontWeight="Bold" />
                             </StackPanel>
                         </Grid>
 
-                        <!-- Markdown Text Area -->
-                        <Border x:Name="EditorInnerBorder" Grid.Row="1" Background="#0B1120" BorderBrush="#334155" BorderThickness="1" CornerRadius="10" Padding="10">
+                        <!-- 3. Document Stats Bar -->
+                        <Grid Grid.Row="2" Margin="0,0,0,8">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <TextBlock x:Name="TxtDocStats" Grid.Column="0" Text="02.webp • 111 ta so'z • 532 ta belgi" Foreground="#64748B" FontSize="11" VerticalAlignment="Center" />
+                            <TextBlock x:Name="TxtDocEngine" Grid.Column="1" Text="⏱ 1537 ms • Windows Native Oflayn OCR" Foreground="#64748B" FontSize="11" VerticalAlignment="Center" />
+                        </Grid>
+
+                        <!-- 4. Markdown Text Area -->
+                        <Border x:Name="EditorInnerBorder" Grid.Row="3" Background="#030712" BorderBrush="#1E293B" BorderThickness="1" CornerRadius="12" Padding="12">
                             <TextBox x:Name="TxtMarkdownEditor"
-                                     Background="Transparent" Foreground="#E2E8F0" BorderThickness="0"
+                                     Background="Transparent" Foreground="#F8FAFC" BorderThickness="0"
                                      FontFamily="Consolas, Cascadia Code, Segoe UI" FontSize="13"
                                      AcceptsReturn="True" AcceptsTab="True" TextWrapping="Wrap"
                                      VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Auto"
@@ -315,21 +359,96 @@
                 </Border>
             </Grid>
 
-            <!-- 4. Footer Status Bar -->
-            <Border x:Name="FooterBorder" Grid.Row="3" Background="#0F172A" CornerRadius="0,0,15,15" BorderBrush="#334155" BorderThickness="0,1,0,0" Padding="14,0">
-                <Grid VerticalAlignment="Center">
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="*" />
-                        <ColumnDefinition Width="Auto" />
-                    </Grid.ColumnDefinitions>
-                    <TextBlock x:Name="TxtStatus" Grid.Column="0" Text="Tayyor. PDF, Word, Excel, PPTX, Rasm yoki Win+Shift+S skrinshotini Ctrl+V bilan qo'ying." Foreground="#94A3B8" FontSize="11" />
-                    <TextBlock x:Name="TxtFooterTagline" Grid.Column="1" Text="Multi-AI Auto-Fallback Architecture • 100% C# .NET 10" Foreground="#64748B" FontSize="11" />
-                </Grid>
+            <!-- 3. API Key Modal Overlay (1:1 with Web ApiKeyModal) -->
+            <Border x:Name="PnlApiKeyModal" Grid.RowSpan="2" Background="#CC000000" Visibility="Collapsed" CornerRadius="16">
+                <Border Width="650" MaxHeight="600" Background="#0F172A" BorderBrush="#4F46E5" BorderThickness="2" CornerRadius="16" Padding="20" HorizontalAlignment="Center" VerticalAlignment="Center">
+                    <StackPanel>
+                        <!-- Modal Header -->
+                        <Grid Margin="0,0,0,16">
+                            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                <TextBlock Text="🔑" FontSize="18" Margin="0,0,8,0" />
+                                <TextBlock Text="Sun'iy Intellekt (AI) &amp; API Sozlamalari" Foreground="#FFFFFF" FontWeight="Bold" FontSize="15" />
+                            </StackPanel>
+                            <Button Click="BtnCloseApiKeyModal_Click" HorizontalAlignment="Right" Style="{StaticResource GlassButton}" Content="✕" Padding="6,2" FontSize="12" />
+                        </Grid>
+
+                        <!-- Provider Selection -->
+                        <TextBlock Text="AI Provayder:" Foreground="#94A3B8" FontSize="12" Margin="0,0,0,4" />
+                        <ComboBox x:Name="CmbAiProvider" SelectionChanged="CmbAiProvider_SelectionChanged"
+                                  Background="#1E293B" Foreground="#FFFFFF" BorderBrush="#334155" Padding="8,6" Margin="0,0,0,12">
+                            <ComboBoxItem Content="Google Gemini (100% Bepul Vision OCR)" Tag="GoogleGemini" />
+                            <ComboBoxItem Content="Groq AI (Ultra-Tez 500+ tok/s)" Tag="GroqAI" />
+                            <ComboBoxItem Content="OpenAI (GPT-4o / GPT-4o-mini)" Tag="OpenAI" />
+                            <ComboBoxItem Content="Anthropic Claude (Claude 3.7 Sonnet)" Tag="AnthropicClaude" />
+                            <ComboBoxItem Content="DeepSeek (R1 / V3)" Tag="DeepSeek" />
+                            <ComboBoxItem Content="Ollama (Lokal / Ofline)" Tag="Ollama" />
+                            <ComboBoxItem Content="Custom Endpoint" Tag="CustomOpenAICompatible" />
+                        </ComboBox>
+
+                        <!-- Model Selection -->
+                        <TextBlock Text="Model:" Foreground="#94A3B8" FontSize="12" Margin="0,0,0,4" />
+                        <ComboBox x:Name="CmbModelName" IsEditable="True"
+                                  Background="#1E293B" Foreground="#FFFFFF" BorderBrush="#334155" Padding="8,6" Margin="0,0,0,12"
+                                  LostFocus="CmbModelName_LostFocus" />
+
+                        <!-- API Key -->
+                        <TextBlock Text="API Kalit:" Foreground="#94A3B8" FontSize="12" Margin="0,0,0,4" />
+                        <PasswordBox x:Name="TxtApiKey" PasswordChar="●"
+                                     Background="#1E293B" Foreground="#FFFFFF" BorderBrush="#334155" Padding="8,6" Margin="0,0,0,12"
+                                     PasswordChanged="TxtApiKey_PasswordChanged" />
+
+                        <!-- Custom URL (for Ollama) -->
+                        <StackPanel x:Name="PnlCustomBaseUrl" Visibility="Collapsed" Margin="0,0,0,12">
+                            <TextBlock Text="Base URL:" Foreground="#94A3B8" FontSize="12" Margin="0,0,0,4" />
+                            <TextBox x:Name="TxtCustomBaseUrl" Text="http://localhost:11434" Style="{StaticResource GlassTextBox}" LostFocus="TxtCustomBaseUrl_LostFocus" />
+                        </StackPanel>
+
+                        <!-- Contextual Guide Banner -->
+                        <Border Background="#0C1A2E" BorderBrush="#1D4ED8" BorderThickness="1" CornerRadius="8" Padding="10,8" Margin="0,0,0,16">
+                            <TextBlock x:Name="TxtKeyGuide" Text="💡 Google AI Studio (aistudio.google.com/app/apikey) ga kiring va 1 daqiqada 100% bepul API kalit oling."
+                                       Foreground="#93C5FD" FontSize="11" TextWrapping="Wrap" />
+                        </Border>
+
+                        <!-- Save Button -->
+                        <Button Click="BtnCloseApiKeyModal_Click" Style="{StaticResource AccentButton}" Content="Saqlash va Yopish" Padding="14,8" FontWeight="Bold" HorizontalAlignment="Stretch" />
+                    </StackPanel>
+                </Border>
+            </Border>
+
+            <!-- 4. Supported Formats Modal Overlay -->
+            <Border x:Name="PnlFormatsModal" Grid.RowSpan="2" Background="#CC000000" Visibility="Collapsed" CornerRadius="16">
+                <Border Width="600" MaxHeight="520" Background="#0F172A" BorderBrush="#4F46E5" BorderThickness="2" CornerRadius="16" Padding="20" HorizontalAlignment="Center" VerticalAlignment="Center">
+                    <StackPanel>
+                        <Grid Margin="0,0,0,14">
+                            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                <TextBlock Text="🗂" FontSize="18" Margin="0,0,8,0" />
+                                <TextBlock Text="Qo'llab-quvvatlanuvchi Formatlar" Foreground="#FFFFFF" FontWeight="Bold" FontSize="15" />
+                            </StackPanel>
+                            <Button Click="BtnCloseFormatsModal_Click" HorizontalAlignment="Right" Style="{StaticResource GlassButton}" Content="✕" Padding="6,2" FontSize="12" />
+                        </Grid>
+
+                        <TextBlock Text="MarkItDown Studio quyidagi barcha formatlarni 100% Markdown ga o'tkazadi:" Foreground="#94A3B8" FontSize="11" Margin="0,0,0,12" />
+
+                        <WrapPanel Margin="0,0,0,14">
+                            <Border Background="#1E293B" CornerRadius="6" Padding="8,4" Margin="3"><TextBlock Text="📄 PDF (Oddiy &amp; Skaner OCR)" Foreground="#F8FAFC" FontSize="11" /></Border>
+                            <Border Background="#1E293B" CornerRadius="6" Padding="8,4" Margin="3"><TextBlock Text="📝 Word (.docx, .doc)" Foreground="#F8FAFC" FontSize="11" /></Border>
+                            <Border Background="#1E293B" CornerRadius="6" Padding="8,4" Margin="3"><TextBlock Text="📊 Excel (.xlsx, .xls, .ods)" Foreground="#F8FAFC" FontSize="11" /></Border>
+                            <Border Background="#1E293B" CornerRadius="6" Padding="8,4" Margin="3"><TextBlock Text="📑 PowerPoint (.pptx, .ppt)" Foreground="#F8FAFC" FontSize="11" /></Border>
+                            <Border Background="#1E293B" CornerRadius="6" Padding="8,4" Margin="3"><TextBlock Text="📈 CSV / TSV Jadvallar" Foreground="#F8FAFC" FontSize="11" /></Border>
+                            <Border Background="#1E293B" CornerRadius="6" Padding="8,4" Margin="3"><TextBlock Text="🌐 HTML / Web Sahifalar" Foreground="#F8FAFC" FontSize="11" /></Border>
+                            <Border Background="#1E293B" CornerRadius="6" Padding="8,4" Margin="3"><TextBlock Text="🖼️ Rasmlar (PNG, JPG, WEBP, SVG)" Foreground="#F8FAFC" FontSize="11" /></Border>
+                            <Border Background="#1E293B" CornerRadius="6" Padding="8,4" Margin="3"><TextBlock Text="🎙️ Audio Ovoz (MP3, WAV, M4A)" Foreground="#F8FAFC" FontSize="11" /></Border>
+                            <Border Background="#1E293B" CornerRadius="6" Padding="8,4" Margin="3"><TextBlock Text="📦 ZIP Arxivlar &amp; Dastur Kodi" Foreground="#F8FAFC" FontSize="11" /></Border>
+                        </WrapPanel>
+
+                        <Button Click="BtnCloseFormatsModal_Click" Style="{StaticResource GlassButton}" Content="Yopish" Padding="14,6" HorizontalAlignment="Stretch" />
+                    </StackPanel>
+                </Border>
             </Border>
 
             <!-- 5. AI Proofreader / Review Modal Overlay -->
-            <Border x:Name="PnlAiReviewModal" Grid.RowSpan="4" Background="#CC000000" Visibility="Collapsed" CornerRadius="16">
-                <Border x:Name="ModalDialogBorder" Width="850" MaxHeight="600" Background="#1E293B" BorderBrush="#6366F1" BorderThickness="2" CornerRadius="16" Padding="20" HorizontalAlignment="Center" VerticalAlignment="Center">
+            <Border x:Name="PnlAiReviewModal" Grid.RowSpan="2" Background="#CC000000" Visibility="Collapsed" CornerRadius="16">
+                <Border Width="850" MaxHeight="600" Background="#0F172A" BorderBrush="#6366F1" BorderThickness="2" CornerRadius="16" Padding="20" HorizontalAlignment="Center" VerticalAlignment="Center">
                     <Grid>
                         <Grid.RowDefinitions>
                             <RowDefinition Height="Auto" />
@@ -347,7 +466,7 @@
                         </Grid>
 
                         <!-- Modal Content Preview -->
-                        <Border Grid.Row="1" Background="#0B1120" BorderBrush="#334155" BorderThickness="1" CornerRadius="10" Padding="10" Margin="0,0,0,14">
+                        <Border Grid.Row="1" Background="#030712" BorderBrush="#334155" BorderThickness="1" CornerRadius="10" Padding="10" Margin="0,0,0,14">
                             <TextBox x:Name="TxtAiProofreadResult"
                                      Background="Transparent" Foreground="#E2E8F0" BorderThickness="0"
                                      FontFamily="Consolas, Cascadia Code, Segoe UI" FontSize="12"
