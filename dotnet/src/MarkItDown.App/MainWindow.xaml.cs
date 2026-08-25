@@ -1,5 +1,6 @@
 using System.Collections.ObjectModel;
 using System.IO;
+using System.Text.RegularExpressions;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
@@ -33,7 +34,8 @@ public partial class MainWindow : Window
     private ConversionResult? _activeResult;
     private bool _isInitializing = true;
     private string _currentLang = "uz";
-    private string _currentViewMode = "Editor"; // Editor, Preview, Split
+    private string _currentContentType = "Obsidian"; // "PlainText" or "Obsidian"
+    private string _currentViewMode = "Editor";      // "Editor", "Preview", "Split"
 
     public MainWindow()
     {
@@ -181,6 +183,10 @@ public partial class MainWindow : Window
                 if (BtnAiProofread != null) BtnAiProofread.Content = "✨ AI Proofread";
                 if (BtnCopyMarkdown != null) BtnCopyMarkdown.Content = "📋 Copy";
                 if (BtnSaveMarkdown != null) BtnSaveMarkdown.Content = "💾 Save .md";
+                if (BtnViewPlainText != null) BtnViewPlainText.Content = "📝 Plain Text";
+                if (BtnViewObsidian != null) BtnViewObsidian.Content = "🔮 Obsidian Preview";
+                if (BtnViewSplit != null) BtnViewSplit.Content = "◫ Split";
+                if (BtnViewEditor != null) BtnViewEditor.Content = "✏️ Editor";
                 if (TxtModalHeader != null) TxtModalHeader.Text = "AI Analysis & Error Correction Result";
                 if (BtnModalCancel != null) BtnModalCancel.Content = "Cancel";
                 if (BtnModalApply != null) BtnModalApply.Content = "✅ Apply to Document";
@@ -199,6 +205,10 @@ public partial class MainWindow : Window
                 if (BtnAiProofread != null) BtnAiProofread.Content = "✨ Проверить с ИИ";
                 if (BtnCopyMarkdown != null) BtnCopyMarkdown.Content = "📋 Копировать";
                 if (BtnSaveMarkdown != null) BtnSaveMarkdown.Content = "💾 Сохранить .md";
+                if (BtnViewPlainText != null) BtnViewPlainText.Content = "📝 Простой текст";
+                if (BtnViewObsidian != null) BtnViewObsidian.Content = "🔮 Obsidian Preview";
+                if (BtnViewSplit != null) BtnViewSplit.Content = "◫ Split";
+                if (BtnViewEditor != null) BtnViewEditor.Content = "✏️ Редактор";
                 if (TxtModalHeader != null) TxtModalHeader.Text = "Результат анализа и исправления ИИ";
                 if (BtnModalCancel != null) BtnModalCancel.Content = "Отмена";
                 if (BtnModalApply != null) BtnModalApply.Content = "✅ Применить к документу";
@@ -217,6 +227,10 @@ public partial class MainWindow : Window
                 if (BtnAiProofread != null) BtnAiProofread.Content = "✨ AI Bilan Tekshirish";
                 if (BtnCopyMarkdown != null) BtnCopyMarkdown.Content = "📋 Nusxa olish";
                 if (BtnSaveMarkdown != null) BtnSaveMarkdown.Content = "💾 .md Saqlash";
+                if (BtnViewPlainText != null) BtnViewPlainText.Content = "📝 Oddiy Matn";
+                if (BtnViewObsidian != null) BtnViewObsidian.Content = "🔮 Obsidian Preview";
+                if (BtnViewSplit != null) BtnViewSplit.Content = "◫ Split";
+                if (BtnViewEditor != null) BtnViewEditor.Content = "✏️ Editor";
                 if (TxtModalHeader != null) TxtModalHeader.Text = "AI Tahlili va Xatoliklarni Tuzatish Natijasi";
                 if (BtnModalCancel != null) BtnModalCancel.Content = "Bekor Qilish";
                 if (BtnModalApply != null) BtnModalApply.Content = "✅ Tasdiqlash va Hujjatga Qo'llash";
@@ -237,7 +251,7 @@ public partial class MainWindow : Window
 ## 1. Capabilities
 - **PDF, Word (.docx), Excel (.xlsx), PowerPoint (.pptx), CSV, JSON, HTML, Code and Images** converted to 100% clean Markdown.
 - **Queue Workflow:** Select files first, check the list, and click **✨ Convert Files to Markdown (.md)**!
-- **Split & Preview:** Switch between Editor, Live Preview, and Split view anytime!
+- **Plain Text & Obsidian Modes:** Switch between clean Plain Text reading/editing and Rich Obsidian HTML preview!
 ",
             "ru" => @"# 📄 Добро пожаловать в MarkItDown Studio! 🚀
 
@@ -246,7 +260,7 @@ public partial class MainWindow : Window
 ## 1. Возможности
 - **PDF, Word (.docx), Excel (.xlsx), PowerPoint (.pptx), CSV, JSON, HTML, Код и Изображения** в 100% чистый Markdown.
 - **Очередь файлов:** Выберите файлы и нажмите **✨ Преобразовать файлы в Markdown (.md)**!
-- **Split и Preview:** Переключайтесь между редактором и живым просмотром в любой момент!
+- **Простой текст и Obsidian:** Переключайтесь между режимом простого текста и богатым просмотром Obsidian!
 ",
             _ => @"# 📄 MarkItDown Studio ga Xush Kelibsiz! 🚀
 
@@ -255,7 +269,7 @@ public partial class MainWindow : Window
 ## 1. Imkoniyatlar
 - **PDF, Word (.docx), Excel (.xlsx), PowerPoint (.pptx), CSV, JSON, HTML, Kod va Rasmlar** 100% toza Markdown formatiga o'tkaziladi.
 - **Fayllar Navbati:** Fayllarni tanlang, ro'yxatni ko'ring va **✨ Matnni Markdown (.md) ga O'tkazish** tugmasini bosing!
-- **Split & Preview:** Split (yonma-yon) yoki Jonli Preview ko'rinishlariga o'ting!
+- **Oddiy Matn va Obsidian Rejimlari:** Oddiy toza o'qish matni yoki Obsidian boy HTML ko'rinishi o'rtasida bemalol almashing!
 "
         };
 
@@ -263,28 +277,22 @@ public partial class MainWindow : Window
         {
             TxtMarkdownEditor.Text = welcomeMd;
         }
+        if (TxtPlainTextEditor != null)
+        {
+            TxtPlainTextEditor.Text = StripMarkdownToPlainText(welcomeMd);
+        }
     }
 
-    // View Modes: Split, Preview, Editor
-    private void BtnViewEditor_Click(object sender, RoutedEventArgs e)
+    // ==========================================
+    // 4 Dynamic View Modes: Plain Text, Obsidian, Split, Editor
+    // ==========================================
+
+    // 1. 📝 Oddiy Matn Preview (Plain Text Clean Reader)
+    private void BtnViewPlainText_Click(object sender, RoutedEventArgs e)
     {
-        _currentViewMode = "Editor";
-        ColEditor.Width = new GridLength(1, GridUnitType.Star);
-        ColSplitter.Width = new GridLength(0);
-        ColPreview.Width = new GridLength(0);
-
-        EditorInnerBorder.Visibility = Visibility.Visible;
-        ViewGridSplitter.Visibility = Visibility.Collapsed;
-        PreviewInnerBorder.Visibility = Visibility.Collapsed;
-
-        BtnViewEditor.Style = (Style)FindResource("AccentButton");
-        BtnViewPreview.Style = (Style)FindResource("GlassButton");
-        BtnViewSplit.Style = (Style)FindResource("GlassButton");
-    }
-
-    private void BtnViewPreview_Click(object sender, RoutedEventArgs e)
-    {
+        _currentContentType = "PlainText";
         _currentViewMode = "Preview";
+
         ColEditor.Width = new GridLength(0);
         ColSplitter.Width = new GridLength(0);
         ColPreview.Width = new GridLength(1, GridUnitType.Star);
@@ -293,16 +301,55 @@ public partial class MainWindow : Window
         ViewGridSplitter.Visibility = Visibility.Collapsed;
         PreviewInnerBorder.Visibility = Visibility.Visible;
 
-        BtnViewEditor.Style = (Style)FindResource("GlassButton");
-        BtnViewPreview.Style = (Style)FindResource("AccentButton");
-        BtnViewSplit.Style = (Style)FindResource("GlassButton");
+        WebMarkdownPreview.Visibility = Visibility.Collapsed;
+        TxtPlainTextPreview.Visibility = Visibility.Visible;
 
-        UpdatePreviewHtml(TxtMarkdownEditor?.Text ?? string.Empty);
+        // Render plain text
+        TxtPlainTextPreview.Text = StripMarkdownToPlainText(TxtMarkdownEditor.Text);
+
+        BtnViewEditor.IsEnabled = true;
+        BtnViewEditor.Opacity = 1.0;
+
+        BtnViewPlainText.Style = (Style)FindResource("AccentButton");
+        BtnViewObsidian.Style = (Style)FindResource("GlassButton");
+        BtnViewSplit.Style = (Style)FindResource("GlassButton");
+        BtnViewEditor.Style = (Style)FindResource("GlassButton");
     }
 
+    // 2. 🔮 Obsidian Preview (Rich Styled Markdown HTML)
+    private void BtnViewObsidian_Click(object sender, RoutedEventArgs e)
+    {
+        _currentContentType = "Obsidian";
+        _currentViewMode = "Preview";
+
+        ColEditor.Width = new GridLength(0);
+        ColSplitter.Width = new GridLength(0);
+        ColPreview.Width = new GridLength(1, GridUnitType.Star);
+
+        EditorInnerBorder.Visibility = Visibility.Collapsed;
+        ViewGridSplitter.Visibility = Visibility.Collapsed;
+        PreviewInnerBorder.Visibility = Visibility.Visible;
+
+        WebMarkdownPreview.Visibility = Visibility.Visible;
+        TxtPlainTextPreview.Visibility = Visibility.Collapsed;
+
+        // Render Obsidian HTML
+        UpdatePreviewHtml(TxtMarkdownEditor.Text);
+
+        BtnViewEditor.IsEnabled = true;
+        BtnViewEditor.Opacity = 1.0;
+
+        BtnViewPlainText.Style = (Style)FindResource("GlassButton");
+        BtnViewObsidian.Style = (Style)FindResource("AccentButton");
+        BtnViewSplit.Style = (Style)FindResource("GlassButton");
+        BtnViewEditor.Style = (Style)FindResource("GlassButton");
+    }
+
+    // 3. ◫ Split Mode (Editor on Left, Active Preview on Right, Editor Button Disabled)
     private void BtnViewSplit_Click(object sender, RoutedEventArgs e)
     {
         _currentViewMode = "Split";
+
         ColEditor.Width = new GridLength(1, GridUnitType.Star);
         ColSplitter.Width = GridLength.Auto;
         ColPreview.Width = new GridLength(1, GridUnitType.Star);
@@ -311,19 +358,125 @@ public partial class MainWindow : Window
         ViewGridSplitter.Visibility = Visibility.Visible;
         PreviewInnerBorder.Visibility = Visibility.Visible;
 
-        BtnViewEditor.Style = (Style)FindResource("GlassButton");
-        BtnViewPreview.Style = (Style)FindResource("GlassButton");
-        BtnViewSplit.Style = (Style)FindResource("AccentButton");
+        if (_currentContentType == "PlainText")
+        {
+            TxtMarkdownEditor.Visibility = Visibility.Collapsed;
+            TxtPlainTextEditor.Visibility = Visibility.Visible;
+            TxtPlainTextEditor.Text = StripMarkdownToPlainText(TxtMarkdownEditor.Text);
 
-        UpdatePreviewHtml(TxtMarkdownEditor?.Text ?? string.Empty);
+            WebMarkdownPreview.Visibility = Visibility.Collapsed;
+            TxtPlainTextPreview.Visibility = Visibility.Visible;
+            TxtPlainTextPreview.Text = TxtPlainTextEditor.Text;
+        }
+        else
+        {
+            TxtMarkdownEditor.Visibility = Visibility.Visible;
+            TxtPlainTextEditor.Visibility = Visibility.Collapsed;
+
+            WebMarkdownPreview.Visibility = Visibility.Visible;
+            TxtPlainTextPreview.Visibility = Visibility.Collapsed;
+            UpdatePreviewHtml(TxtMarkdownEditor.Text);
+        }
+
+        // Deactivate Editor button while Split is active
+        BtnViewEditor.IsEnabled = false;
+        BtnViewEditor.Opacity = 0.5;
+
+        BtnViewPlainText.Style = (Style)FindResource("GlassButton");
+        BtnViewObsidian.Style = (Style)FindResource("GlassButton");
+        BtnViewSplit.Style = (Style)FindResource("AccentButton");
+        BtnViewEditor.Style = (Style)FindResource("GlassButton");
+    }
+
+    // 4. ✏️ Editor Mode (Opens editor for the currently active content type)
+    private void BtnViewEditor_Click(object sender, RoutedEventArgs e)
+    {
+        if (_currentViewMode == "Split") return; // Disabled during split
+
+        _currentViewMode = "Editor";
+
+        ColEditor.Width = new GridLength(1, GridUnitType.Star);
+        ColSplitter.Width = new GridLength(0);
+        ColPreview.Width = new GridLength(0);
+
+        EditorInnerBorder.Visibility = Visibility.Visible;
+        ViewGridSplitter.Visibility = Visibility.Collapsed;
+        PreviewInnerBorder.Visibility = Visibility.Collapsed;
+
+        if (_currentContentType == "PlainText")
+        {
+            TxtMarkdownEditor.Visibility = Visibility.Collapsed;
+            TxtPlainTextEditor.Visibility = Visibility.Visible;
+            TxtPlainTextEditor.Text = StripMarkdownToPlainText(TxtMarkdownEditor.Text);
+        }
+        else
+        {
+            TxtMarkdownEditor.Visibility = Visibility.Visible;
+            TxtPlainTextEditor.Visibility = Visibility.Collapsed;
+        }
+
+        BtnViewEditor.IsEnabled = true;
+        BtnViewEditor.Opacity = 1.0;
+
+        BtnViewPlainText.Style = (Style)FindResource("GlassButton");
+        BtnViewObsidian.Style = (Style)FindResource("GlassButton");
+        BtnViewSplit.Style = (Style)FindResource("GlassButton");
+        BtnViewEditor.Style = (Style)FindResource("AccentButton");
     }
 
     private void TxtMarkdownEditor_TextChanged(object sender, TextChangedEventArgs e)
     {
+        if (_isInitializing) return;
+
         if (_currentViewMode == "Split" || _currentViewMode == "Preview")
         {
-            UpdatePreviewHtml(TxtMarkdownEditor.Text);
+            if (_currentContentType == "PlainText")
+            {
+                TxtPlainTextPreview.Text = StripMarkdownToPlainText(TxtMarkdownEditor.Text);
+            }
+            else
+            {
+                UpdatePreviewHtml(TxtMarkdownEditor.Text);
+            }
         }
+    }
+
+    private void TxtPlainTextEditor_TextChanged(object sender, TextChangedEventArgs e)
+    {
+        if (_isInitializing) return;
+
+        if (_currentViewMode == "Split" && _currentContentType == "PlainText")
+        {
+            TxtPlainTextPreview.Text = TxtPlainTextEditor.Text;
+        }
+    }
+
+    // Strip Markdown to pure clean Plain Text
+    public static string StripMarkdownToPlainText(string markdown)
+    {
+        if (string.IsNullOrEmpty(markdown)) return string.Empty;
+
+        var text = markdown;
+        text = Regex.Replace(text, @"```[\s\S]*?```", m =>
+        {
+            var code = m.Value;
+            var lines = code.Split('\n');
+            return string.Join("\n", lines.Skip(1).Take(Math.Max(0, lines.Length - 2)));
+        });
+        text = Regex.Replace(text, @"`([^`]+)`", "$1");
+        text = Regex.Replace(text, @"!\[([^\]]*)\]\([^\)]+\)", "$1");
+        text = Regex.Replace(text, @"\[([^\]]+)\]\([^\)]+\)", "$1");
+        text = Regex.Replace(text, @"^#{1,6}\s*", "", RegexOptions.Multiline);
+        text = Regex.Replace(text, @"^>\s*", "", RegexOptions.Multiline);
+        text = Regex.Replace(text, @"\*\*([^*]+)\*\*", "$1");
+        text = Regex.Replace(text, @"\*([^*]+)\*", "$1");
+        text = Regex.Replace(text, @"__([^_]+)__", "$1");
+        text = Regex.Replace(text, @"_([^_]+)_", "$1");
+        text = Regex.Replace(text, @"^---+\s*$", "", RegexOptions.Multiline);
+        text = Regex.Replace(text, @"\|-+\|-+.*", "");
+        text = Regex.Replace(text, @"\|", " ");
+
+        return text.Trim();
     }
 
     private void UpdatePreviewHtml(string markdown)
@@ -396,11 +549,26 @@ public partial class MainWindow : Window
         BtnTabUrl.Style = (Style)FindResource("AccentButton");
     }
 
-    // Modals
-    private void BtnOpenApiKey_Click(object sender, RoutedEventArgs e) => PnlApiKeyModal.Visibility = Visibility.Visible;
+    // ==========================================
+    // Modals with HWND Airspace Fix (prevents freeze!)
+    // ==========================================
+    private void BtnOpenApiKey_Click(object sender, RoutedEventArgs e)
+    {
+        // Temporarily hide native Win32 WebBrowser control to prevent WPF airspace capture
+        if (PreviewInnerBorder != null) PreviewInnerBorder.Visibility = Visibility.Collapsed;
+        PnlApiKeyModal.Visibility = Visibility.Visible;
+    }
+
     private void BtnCloseApiKeyModal_Click(object sender, RoutedEventArgs e)
     {
         PnlApiKeyModal.Visibility = Visibility.Collapsed;
+
+        // Restore preview visibility if in Preview or Split mode
+        if (_currentViewMode == "Preview" || _currentViewMode == "Split")
+        {
+            if (PreviewInnerBorder != null) PreviewInnerBorder.Visibility = Visibility.Visible;
+        }
+
         _config.SelectedProvider = GetSelectedProvider();
         _config.SelectedModel = CmbModelName?.Text?.Trim() ?? "gemini-2.5-flash";
         _config.SetApiKey(_config.SelectedProvider, TxtApiKey?.Password?.Trim() ?? string.Empty);
@@ -409,15 +577,27 @@ public partial class MainWindow : Window
         UpdateKeyStatusAndGuide(_config.SelectedProvider, TxtApiKey?.Password?.Trim() ?? string.Empty);
     }
 
-    private void BtnOpenFormats_Click(object sender, RoutedEventArgs e) => PnlFormatsModal.Visibility = Visibility.Visible;
-    private void BtnCloseFormatsModal_Click(object sender, RoutedEventArgs e) => PnlFormatsModal.Visibility = Visibility.Collapsed;
+    private void BtnOpenFormats_Click(object sender, RoutedEventArgs e)
+    {
+        if (PreviewInnerBorder != null) PreviewInnerBorder.Visibility = Visibility.Collapsed;
+        PnlFormatsModal.Visibility = Visibility.Visible;
+    }
+
+    private void BtnCloseFormatsModal_Click(object sender, RoutedEventArgs e)
+    {
+        PnlFormatsModal.Visibility = Visibility.Collapsed;
+        if (_currentViewMode == "Preview" || _currentViewMode == "Split")
+        {
+            if (PreviewInnerBorder != null) PreviewInnerBorder.Visibility = Visibility.Visible;
+        }
+    }
 
     // Window KeyDown (Ctrl+V paste image/text)
     private async void Window_KeyDown(object sender, KeyEventArgs e)
     {
         if (e.Key == Key.V && (Keyboard.Modifiers & ModifierKeys.Control) == ModifierKeys.Control)
         {
-            if (TxtMarkdownEditor.IsFocused || TxtWebUrl.IsFocused || TxtApiKey.IsFocused) return;
+            if (TxtMarkdownEditor.IsFocused || TxtPlainTextEditor.IsFocused || TxtWebUrl.IsFocused || TxtApiKey.IsFocused) return;
 
             if (Clipboard.ContainsImage())
             {
@@ -792,10 +972,20 @@ public partial class MainWindow : Window
         _activeResult = result;
         if (TxtDocStats != null) TxtDocStats.Text = $"{result.FileName} • {result.WordCount:N0} ta so'z • {result.CharCount:N0} ta belgi";
         if (TxtDocEngine != null) TxtDocEngine.Text = $"⏱ {result.DurationMs} ms • {result.EngineName}";
+
         if (TxtMarkdownEditor != null) TxtMarkdownEditor.Text = result.Markdown;
-        if (_currentViewMode == "Split" || _currentViewMode == "Preview")
+        if (TxtPlainTextEditor != null) TxtPlainTextEditor.Text = StripMarkdownToPlainText(result.Markdown);
+
+        if (_currentViewMode == "Preview" || _currentViewMode == "Split")
         {
-            UpdatePreviewHtml(result.Markdown);
+            if (_currentContentType == "PlainText")
+            {
+                if (TxtPlainTextPreview != null) TxtPlainTextPreview.Text = StripMarkdownToPlainText(result.Markdown);
+            }
+            else
+            {
+                UpdatePreviewHtml(result.Markdown);
+            }
         }
     }
 
@@ -844,6 +1034,7 @@ public partial class MainWindow : Window
         var aiConfig = GetCurrentAiConfig();
         if (aiConfig.Provider != AiProvider.Ollama && string.IsNullOrWhiteSpace(aiConfig.ApiKey))
         {
+            if (PreviewInnerBorder != null) PreviewInnerBorder.Visibility = Visibility.Collapsed;
             PnlApiKeyModal.Visibility = Visibility.Visible;
             return;
         }
@@ -856,6 +1047,8 @@ public partial class MainWindow : Window
             var (correctedMd, _) = await _aiClient.ConvertWithAiAsync(rawBytes, "text/plain", "document_review.md", aiConfig, prompt);
 
             if (TxtAiProofreadResult != null) TxtAiProofreadResult.Text = correctedMd;
+
+            if (PreviewInnerBorder != null) PreviewInnerBorder.Visibility = Visibility.Collapsed;
             if (PnlAiReviewModal != null) PnlAiReviewModal.Visibility = Visibility.Visible;
         }
         catch (Exception ex)
@@ -864,7 +1057,14 @@ public partial class MainWindow : Window
         }
     }
 
-    private void BtnCloseReviewModal_Click(object sender, RoutedEventArgs e) => PnlAiReviewModal.Visibility = Visibility.Collapsed;
+    private void BtnCloseReviewModal_Click(object sender, RoutedEventArgs e)
+    {
+        if (PnlAiReviewModal != null) PnlAiReviewModal.Visibility = Visibility.Collapsed;
+        if (_currentViewMode == "Preview" || _currentViewMode == "Split")
+        {
+            if (PreviewInnerBorder != null) PreviewInnerBorder.Visibility = Visibility.Visible;
+        }
+    }
 
     private void BtnApplyAiProofread_Click(object sender, RoutedEventArgs e)
     {
@@ -881,41 +1081,51 @@ public partial class MainWindow : Window
                 if (TxtDocStats != null) TxtDocStats.Text = $"{_activeResult.FileName} • {_activeResult.WordCount:N0} ta so'z • {_activeResult.CharCount:N0} ta belgi (AI Verified)";
             }
             if (PnlAiReviewModal != null) PnlAiReviewModal.Visibility = Visibility.Collapsed;
+            if (_currentViewMode == "Preview" || _currentViewMode == "Split")
+            {
+                if (PreviewInnerBorder != null) PreviewInnerBorder.Visibility = Visibility.Visible;
+            }
             MessageBox.Show("Markdown hujjati AI tuzatishlari bilan yangilandi!", "Muvaffaqiyatli", MessageBoxButton.OK, MessageBoxImage.Information);
         }
     }
 
     private void BtnCopyMarkdown_Click(object sender, RoutedEventArgs e)
     {
-        if (TxtMarkdownEditor != null && !string.IsNullOrEmpty(TxtMarkdownEditor.Text))
+        var textToCopy = _currentContentType == "PlainText" ? TxtPlainTextEditor.Text : TxtMarkdownEditor.Text;
+        if (!string.IsNullOrEmpty(textToCopy))
         {
-            Clipboard.SetText(TxtMarkdownEditor.Text);
+            Clipboard.SetText(textToCopy);
             MessageBox.Show("Nusxalandi!", "Muvaffaqiyatli", MessageBoxButton.OK, MessageBoxImage.Information);
         }
     }
 
     private void BtnSaveMarkdown_Click(object sender, RoutedEventArgs e)
     {
-        if (TxtMarkdownEditor == null || string.IsNullOrWhiteSpace(TxtMarkdownEditor.Text))
+        var textToSave = _currentContentType == "PlainText" ? TxtPlainTextEditor.Text : TxtMarkdownEditor.Text;
+        if (string.IsNullOrWhiteSpace(textToSave))
         {
-            MessageBox.Show("Markdown matni mavjud emas.", "Xabar", MessageBoxButton.OK, MessageBoxImage.Information);
+            MessageBox.Show("Matn mavjud emas.", "Xabar", MessageBoxButton.OK, MessageBoxImage.Information);
             return;
         }
 
+        var isPlain = _currentContentType == "PlainText";
+        var defaultExt = isPlain ? ".txt" : ".md";
         var defaultName = _activeResult != null
-            ? $"{Path.GetFileNameWithoutExtension(_activeResult.FileName)}.md"
-            : "document.md";
+            ? $"{Path.GetFileNameWithoutExtension(_activeResult.FileName)}{defaultExt}"
+            : $"document{defaultExt}";
 
         var dlg = new SaveFileDialog
         {
             FileName = defaultName,
-            DefaultExt = ".md",
-            Filter = "Markdown Document (*.md)|*.md|Text Document (*.txt)|*.txt|All Files (*.*)|*.*"
+            DefaultExt = defaultExt,
+            Filter = isPlain
+                ? "Text Document (*.txt)|*.txt|Markdown Document (*.md)|*.md|All Files (*.*)|*.*"
+                : "Markdown Document (*.md)|*.md|Text Document (*.txt)|*.txt|All Files (*.*)|*.*"
         };
 
         if (dlg.ShowDialog() == true)
         {
-            File.WriteAllText(dlg.FileName, TxtMarkdownEditor.Text, System.Text.Encoding.UTF8);
+            File.WriteAllText(dlg.FileName, textToSave, System.Text.Encoding.UTF8);
             MessageBox.Show($"Fayl saqlandi:\n{dlg.FileName}", "Muvaffaqiyatli", MessageBoxButton.OK, MessageBoxImage.Information);
         }
     }
