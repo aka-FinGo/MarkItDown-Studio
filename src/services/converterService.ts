@@ -73,13 +73,73 @@ function normalizeText(text: string): string {
     .replace(/[\u200B-\u200D\uFEFF]/g, "");
 }
 
-// Client-Side Offline WebAssembly OCR via Tesseract.js
+// Client-Side Intelligent OCR Text Cleaner & Uzbek Cyrillic/Latin Normalizer
+export function cleanOcrText(rawText: string): string {
+  if (!rawText) return "";
+
+  const lines = rawText.split(/\r?\n/);
+  const cleaned: string[] = [];
+
+  const replacements: [RegExp, string][] = [
+    [/\bконуила?ри\b/gi, "қонунлари"],
+    [/\bконунлари\b/gi, "қонунлари"],
+    [/\bконуни\b/gi, "қонуни"],
+    [/\bномиддги\b/gi, "номидаги"],
+    [/\bномидаги\b/gi, "номидаги"],
+    [/\bкодирий\b/gi, "қодирий"],
+    [/\bхалк\b/gi, "халқ"],
+    [/\bузбекистон\b/gi, "ўзбекистон"],
+    [/\bкулёзма\b/gi, "қўлёзма"],
+    [/\bкисм\b/gi, "қисм"],
+    [/\bкулланма\b/gi, "қўлланма"],
+    [/\bжумхурияти\b/gi, "жумҳурияти"],
+    [/\bкитоби\b/gi, "китоби"],
+    [/\bсайланма\b/gi, "сайланма"],
+    [/\bжилдлик\b/gi, "жилдлик"],
+    [/\bтошкент\b/gi, "тошкент"],
+  ];
+
+  for (const originalLine of lines) {
+    let line = originalLine.trim();
+    if (!line) continue;
+
+    // Remove stray artifact characters
+    line = line.replace(/^[|~_`•\-\—\s]+|[|~_`•\-\—\s]+$/g, "");
+    if (line.length <= 1 && !/[a-zA-Zа-яА-Я0-9]/.test(line[0])) continue;
+
+    // Fix mixed case glitch inside words (e.g. "конуилаРи" -> "қонунлари")
+    line = line.replace(/\b[\p{L}]+\b/gu, (word) => {
+      if (word.length <= 2) return word;
+      const uppers = (word.match(/[A-ZА-ЯЁ]/g) || []).length;
+      const lowers = (word.match(/[a-zа-яё]/g) || []).length;
+      if (uppers >= word.length - 1 && uppers > lowers) return word.toUpperCase();
+      if (lowers > uppers) {
+        return word.charAt(0).toUpperCase() === word.charAt(0)
+          ? word.charAt(0) + word.slice(1).toLowerCase()
+          : word.toLowerCase();
+      }
+      return word;
+    });
+
+    // Apply dictionary replacements
+    for (const [pattern, rep] of replacements) {
+      line = line.replace(pattern, rep);
+    }
+
+    line = line.replace(/\s+([,.:;?!])/g, "$1").replace(/([,.:;?!])([^\s0-9])/g, "$1 $2").replace(/\s{2,}/g, " ");
+    cleaned.push(line.trim());
+  }
+
+  return cleaned.join("\n").trim();
+}
+
+// Client-Side Offline WebAssembly OCR via Tesseract.js with auto-cleaning
 export async function runClientOfflineOcr(imageSource: Blob | string): Promise<string> {
   try {
-    const worker = await createWorker("eng+rus");
+    const worker = await createWorker("rus+eng");
     const ret = await worker.recognize(imageSource);
     await worker.terminate();
-    return ret.data.text.trim();
+    return cleanOcrText(ret.data.text);
   } catch (err) {
     console.warn("Offline OCR warning:", err);
     return "";
