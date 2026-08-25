@@ -93,6 +93,54 @@ public class AppConfig
         return SavedApiKeys.TryGetValue(provider.ToString(), out var key) ? key : string.Empty;
     }
 
+    public List<string> GetModelsForProvider(AiProvider provider)
+    {
+        var list = new List<string>();
+        if (AiProviderConfig.RecommendedModels.TryGetValue(provider, out var defaultModels))
+        {
+            list.AddRange(defaultModels);
+        }
+
+        if (CustomModels.TryGetValue(provider.ToString(), out var custom) && custom != null)
+        {
+            foreach (var m in custom)
+            {
+                if (!list.Contains(m, StringComparer.OrdinalIgnoreCase))
+                {
+                    list.Add(m);
+                }
+            }
+        }
+
+        return list;
+    }
+
+    public void AddCustomModel(AiProvider provider, string modelName)
+    {
+        if (string.IsNullOrWhiteSpace(modelName)) return;
+        var pKey = provider.ToString();
+        if (!CustomModels.ContainsKey(pKey))
+        {
+            CustomModels[pKey] = new List<string>();
+        }
+
+        if (!CustomModels[pKey].Contains(modelName.Trim(), StringComparer.OrdinalIgnoreCase))
+        {
+            CustomModels[pKey].Add(modelName.Trim());
+            Save();
+        }
+    }
+
+    public void RemoveCustomModel(AiProvider provider, string modelName)
+    {
+        var pKey = provider.ToString();
+        if (CustomModels.TryGetValue(pKey, out var list))
+        {
+            list.RemoveAll(m => string.Equals(m, modelName, StringComparison.OrdinalIgnoreCase));
+            Save();
+        }
+    }
+
     private static string ProtectString(string plainText)
     {
         if (string.IsNullOrEmpty(plainText)) return string.Empty;

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { Key, X, Check, ExternalLink, ShieldCheck, Sparkles, Zap, Server } from "lucide-react";
+import { Key, X, Check, ExternalLink, Trash2, Plus, Server } from "lucide-react";
 
 interface ApiKeyModalProps {
   isOpen: boolean;
@@ -10,20 +10,15 @@ interface ApiKeyModalProps {
   currentModel?: string;
 }
 
-const RECOMMENDED_MODELS: Record<string, string[]> = {
+const DEFAULT_RECOMMENDED_MODELS: Record<string, string[]> = {
   GoogleGemini: [
     "gemini-2.5-flash",
     "gemini-2.5-pro",
-    "gemini-3.7-flash",
-    "gemini-3-flash",
-    "gemini-3-pro",
-    "gemini-3-deep-think",
     "gemini-2.5-flash-lite",
-    "gemini-2.5-flash-image",
     "gemini-2.0-flash",
+    "gemini-2.0-pro-exp-02-05",
     "gemini-1.5-pro",
     "gemini-1.5-flash",
-    "gemini-live-2.5-flash-preview-native-audio-09-2025",
   ],
   GroqAI: [
     "llama-3.3-70b-versatile",
@@ -33,31 +28,53 @@ const RECOMMENDED_MODELS: Record<string, string[]> = {
     "mistral-saba-24b",
     "gemma2-9b-it",
     "whisper-large-v3-turbo",
-    "whisper-large-v3",
-    "meta-llama/llama-4-maverick-17b-128e-instruct",
+  ],
+  OpenRouter: [
+    "google/gemini-2.5-flash",
+    "google/gemini-2.5-pro",
+    "deepseek/deepseek-r1",
+    "deepseek/deepseek-chat",
+    "anthropic/claude-3.7-sonnet",
+    "openai/gpt-4o",
+    "openai/gpt-4o-mini",
+    "meta-llama/llama-3.3-70b-instruct",
+    "qwen/qwen-2.5-72b-instruct",
+    "mistralai/mistral-large-2411",
   ],
   OpenAI: [
     "gpt-4o",
     "gpt-4o-mini",
     "o3-mini",
     "o1",
+    "o1-mini",
     "gpt-4-turbo",
   ],
   AnthropicClaude: [
     "claude-3-7-sonnet-20250219",
     "claude-3-5-sonnet-20241022",
     "claude-3-5-haiku-20241022",
+    "claude-3-opus-20240229",
   ],
   DeepSeek: [
     "deepseek-chat",
     "deepseek-reasoner",
   ],
-  Ollama: [
+  OllamaLocal: [
     "llama3.2-vision",
     "llava:latest",
     "qwen2.5-vl:latest",
+    "deepseek-r1:14b",
+    "deepseek-r1:8b",
+    "llama3.3:70b",
     "mistral:latest",
+    "phi4:latest",
+  ],
+  OllamaCloud: [
+    "llama3.2-vision",
     "deepseek-r1:latest",
+    "qwen2.5-vl:latest",
+    "llama3.3:latest",
+    "mistral:latest",
   ],
   Custom: [
     "default-model",
@@ -75,6 +92,11 @@ const PROVIDER_GUIDES: Record<string, { text: string; linkText: string; url: str
     linkText: "Groq Console",
     url: "https://console.groq.com/keys",
   },
+  OpenRouter: {
+    text: "OpenRouter ga kiring va yagona API kalit orqali 300+ AI modellardan foydalaning.",
+    linkText: "OpenRouter Keys",
+    url: "https://openrouter.ai/keys",
+  },
   OpenAI: {
     text: "OpenAI Platform ga kiring va yangi Secret API Key yarating.",
     linkText: "OpenAI Platform",
@@ -90,9 +112,14 @@ const PROVIDER_GUIDES: Record<string, { text: string; linkText: string; url: str
     linkText: "DeepSeek Platform",
     url: "https://platform.deepseek.com/api_keys",
   },
-  Ollama: {
-    text: "Kompyuteringizda 'ollama run llama3.2-vision' buyrug'ini bering (API kalit shart emas, 100% lokal).",
+  OllamaLocal: {
+    text: "Kompyuteringizda 'ollama run llama3.2-vision' buyrug'ini bering (Lokal, API kalitsiz).",
     linkText: "Ollama Sayti",
+    url: "https://ollama.com",
+  },
+  OllamaCloud: {
+    text: "Masofaviy Ollama serveringiz manzilini (Base URL) va model nomini kiriting.",
+    linkText: "Ollama Docs",
     url: "https://ollama.com",
   },
   Custom: {
@@ -114,7 +141,21 @@ export const ApiKeyModal: React.FC<ApiKeyModalProps> = ({
   const [model, setModel] = useState(currentModel);
   const [apiKey, setApiKey] = useState(currentKey);
   const [baseUrl, setBaseUrl] = useState("http://localhost:11434");
+  const [newModelInput, setNewModelInput] = useState("");
+  const [customModels, setCustomModels] = useState<Record<string, string[]>>({});
   const [showSavedToast, setShowSavedToast] = useState(false);
+
+  // Load custom models from localStorage
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem("markitdown_custom_models");
+      if (saved) {
+        setCustomModels(JSON.parse(saved));
+      }
+    } catch (e) {
+      console.error("Failed to load custom models:", e);
+    }
+  }, []);
 
   useEffect(() => {
     setApiKey(currentKey);
@@ -124,14 +165,61 @@ export const ApiKeyModal: React.FC<ApiKeyModalProps> = ({
 
   if (!isOpen) return null;
 
+  const getCombinedModels = (p: string) => {
+    const defaults = DEFAULT_RECOMMENDED_MODELS[p] || ["default-model"];
+    const customs = customModels[p] || [];
+    const combined = [...defaults];
+    customs.forEach((m) => {
+      if (!combined.includes(m)) combined.push(m);
+    });
+    return combined;
+  };
+
   const handleProviderChange = (p: string) => {
     setProvider(p);
-    const models = RECOMMENDED_MODELS[p] || ["default-model"];
+    const models = getCombinedModels(p);
     setModel(models[0]);
+    if (p === "OllamaLocal") {
+      setBaseUrl("http://localhost:11434");
+    }
+  };
+
+  const handleAddCustomModel = () => {
+    const trimmed = newModelInput.trim();
+    if (!trimmed) return;
+
+    const currentList = customModels[provider] || [];
+    if (!currentList.includes(trimmed)) {
+      const updated = {
+        ...customModels,
+        [provider]: [...currentList, trimmed],
+      };
+      setCustomModels(updated);
+      localStorage.setItem("markitdown_custom_models", JSON.stringify(updated));
+    }
+
+    setModel(trimmed);
+    setNewModelInput("");
+  };
+
+  const handleDeleteModel = (modelToDelete: string) => {
+    const currentList = customModels[provider] || [];
+    const updatedList = currentList.filter((m) => m !== modelToDelete);
+    const updated = {
+      ...customModels,
+      [provider]: updatedList,
+    };
+    setCustomModels(updated);
+    localStorage.setItem("markitdown_custom_models", JSON.stringify(updated));
+
+    const remaining = getCombinedModels(provider).filter((m) => m !== modelToDelete);
+    if (remaining.length > 0) {
+      setModel(remaining[0]);
+    }
   };
 
   const handleSave = () => {
-    onSaveApiKey(apiKey.trim(), provider, model, baseUrl);
+    onSaveApiKey(apiKey.trim(), provider, model.trim(), baseUrl);
     setShowSavedToast(true);
     setTimeout(() => {
       setShowSavedToast(false);
@@ -145,7 +233,8 @@ export const ApiKeyModal: React.FC<ApiKeyModalProps> = ({
   };
 
   const currentGuide = PROVIDER_GUIDES[provider] || PROVIDER_GUIDES.GoogleGemini;
-  const availableModels = RECOMMENDED_MODELS[provider] || [model];
+  const availableModels = getCombinedModels(provider);
+  const isCustomModel = (customModels[provider] || []).includes(model);
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-zinc-950/70 backdrop-blur-xs animate-in fade-in duration-200">
@@ -158,7 +247,7 @@ export const ApiKeyModal: React.FC<ApiKeyModalProps> = ({
             </div>
             <div>
               <h3 className="text-sm font-bold text-white">Multi-Provider AI &amp; Modellar</h3>
-              <p className="text-[11px] text-zinc-400">Gemini, Groq, OpenAI, Claude, DeepSeek, Ollama</p>
+              <p className="text-[11px] text-zinc-400">Gemini, Groq, OpenRouter, OpenAI, Claude, DeepSeek, Ollama</p>
             </div>
           </div>
           <button
@@ -170,7 +259,7 @@ export const ApiKeyModal: React.FC<ApiKeyModalProps> = ({
         </div>
 
         {/* Provider & Model Selectors */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        <div className="space-y-3">
           <div>
             <label className="block text-xs font-semibold text-zinc-300 mb-1">AI Provayder:</label>
             <select
@@ -178,34 +267,70 @@ export const ApiKeyModal: React.FC<ApiKeyModalProps> = ({
               onChange={(e) => handleProviderChange(e.target.value)}
               className="w-full px-3 py-2 text-xs border border-zinc-700 rounded-xl bg-zinc-800 text-white focus:outline-none focus:ring-1 focus:ring-indigo-500 font-medium cursor-pointer"
             >
-              <option value="GoogleGemini">Google Gemini (Barcha Modellar)</option>
+              <option value="GoogleGemini">Google Gemini (100% Bepul Vision OCR)</option>
               <option value="GroqAI">⚡ Groq AI (Ultra-Tez 500+ tok/s)</option>
-              <option value="OpenAI">OpenAI (GPT-4o, o1, o3-mini)</option>
-              <option value="AnthropicClaude">Anthropic Claude 3.7 / 3.5</option>
+              <option value="OpenRouter">🌐 OpenRouter (300+ AI Modellari)</option>
+              <option value="OpenAI">OpenAI (GPT-4o, o3-mini, o1)</option>
+              <option value="AnthropicClaude">Anthropic Claude (Claude 3.7 Sonnet)</option>
               <option value="DeepSeek">DeepSeek (V3, R1 Reasoner)</option>
-              <option value="Ollama">Ollama (Lokal / Ofline)</option>
-              <option value="Custom">Custom Endpoint</option>
+              <option value="OllamaLocal">Ollama (Lokal / Desktop)</option>
+              <option value="OllamaCloud">Ollama (Cloud / Masofaviy Endpoint)</option>
+              <option value="Custom">Custom OpenAI-Mos Endpoint</option>
             </select>
           </div>
 
+          {/* Model Selection & Custom Model Management */}
           <div>
-            <label className="block text-xs font-semibold text-zinc-300 mb-1">Modelni Tanlang:</label>
-            <select
-              value={model}
-              onChange={(e) => setModel(e.target.value)}
-              className="w-full px-3 py-2 text-xs border border-zinc-700 rounded-xl bg-zinc-800 text-white focus:outline-none focus:ring-1 focus:ring-indigo-500 font-mono cursor-pointer"
+            <div className="flex items-center justify-between mb-1">
+              <label className="text-xs font-semibold text-zinc-300">Modelni Tanlang yoki Tahrirlang:</label>
+              {isCustomModel && (
+                <button
+                  onClick={() => handleDeleteModel(model)}
+                  className="text-[11px] text-red-400 hover:text-red-300 flex items-center gap-1 cursor-pointer font-medium"
+                  title="Tanlangan modelni o'chirish"
+                >
+                  <Trash2 className="w-3 h-3" />
+                  <span>Modelni o'chirish</span>
+                </button>
+              )}
+            </div>
+            <div className="flex gap-2">
+              <select
+                value={model}
+                onChange={(e) => setModel(e.target.value)}
+                className="flex-1 px-3 py-2 text-xs border border-zinc-700 rounded-xl bg-zinc-800 text-white focus:outline-none focus:ring-1 focus:ring-indigo-500 font-mono cursor-pointer"
+              >
+                {availableModels.map((m) => (
+                  <option key={m} value={m}>
+                    {m}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
+
+          {/* Add New Custom Model Input */}
+          <div className="flex gap-2 items-center">
+            <input
+              type="text"
+              value={newModelInput}
+              onChange={(e) => setNewModelInput(e.target.value)}
+              placeholder="Yangi model nomini kiriting (masalan: gemini-2.0-flash)..."
+              className="flex-1 px-3 py-1.5 text-xs font-mono border border-zinc-700 rounded-xl bg-zinc-800/90 text-white placeholder-zinc-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+            />
+            <button
+              onClick={handleAddCustomModel}
+              disabled={!newModelInput.trim()}
+              className="px-3 py-1.5 bg-zinc-800 hover:bg-zinc-700 border border-zinc-700 text-indigo-400 hover:text-indigo-300 rounded-xl text-xs font-semibold flex items-center gap-1 cursor-pointer disabled:opacity-50"
             >
-              {availableModels.map((m) => (
-                <option key={m} value={m}>
-                  {m}
-                </option>
-              ))}
-            </select>
+              <Plus className="w-3.5 h-3.5" />
+              <span>Qo'shish</span>
+            </button>
           </div>
         </div>
 
         {/* Base URL for Ollama / Custom */}
-        {(provider === "Ollama" || provider === "Custom") && (
+        {(provider === "OllamaLocal" || provider === "OllamaCloud" || provider === "Custom") && (
           <div>
             <label className="block text-xs font-semibold text-zinc-300 mb-1">Base URL:</label>
             <input
@@ -219,7 +344,7 @@ export const ApiKeyModal: React.FC<ApiKeyModalProps> = ({
         )}
 
         {/* API Key Input */}
-        {provider !== "Ollama" && (
+        {provider !== "OllamaLocal" && (
           <div className="space-y-1.5">
             <label className="block text-xs font-semibold text-zinc-300">
               API Kalitingiz ({provider}):
@@ -228,14 +353,14 @@ export const ApiKeyModal: React.FC<ApiKeyModalProps> = ({
               type="password"
               value={apiKey}
               onChange={(e) => setApiKey(e.target.value)}
-              placeholder={provider === "GoogleGemini" ? "AIzaSy..." : provider === "GroqAI" ? "gsk_..." : "sk-..."}
+              placeholder={provider === "GoogleGemini" ? "AIzaSy..." : provider === "GroqAI" ? "gsk_..." : provider === "OpenRouter" ? "sk-or-v1-..." : "sk-..."}
               className="w-full px-3 py-2.5 text-xs font-mono border border-zinc-700 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-500 bg-zinc-800/80 text-white"
             />
           </div>
         )}
 
         {/* Dynamic Contextual Guide Banner when API Key is empty */}
-        {provider !== "Ollama" && !apiKey.trim() && (
+        {provider !== "OllamaLocal" && !apiKey.trim() && (
           <div className="p-3.5 bg-indigo-950/50 border border-indigo-500/40 rounded-xl text-xs space-y-1 animate-in fade-in">
             <div className="flex items-center justify-between text-indigo-300 font-bold">
               <span>{provider} API kalitini olish:</span>

@@ -4,10 +4,12 @@ public enum AiProvider
 {
     GoogleGemini,
     GroqAI,
+    OpenRouter,
     OpenAI,
     AnthropicClaude,
     DeepSeek,
-    Ollama,
+    OllamaLocal,
+    OllamaCloud,
     CustomOpenAICompatible
 }
 
@@ -24,16 +26,11 @@ public class AiProviderConfig
         {
             "gemini-2.5-flash",
             "gemini-2.5-pro",
-            "gemini-3.7-flash",
-            "gemini-3-flash",
-            "gemini-3-pro",
-            "gemini-3-deep-think",
             "gemini-2.5-flash-lite",
-            "gemini-2.5-flash-image",
             "gemini-2.0-flash",
+            "gemini-2.0-pro-exp-02-05",
             "gemini-1.5-pro",
-            "gemini-1.5-flash",
-            "gemini-live-2.5-flash-preview-native-audio-09-2025"
+            "gemini-1.5-flash"
         },
         [AiProvider.GroqAI] = new()
         {
@@ -43,10 +40,20 @@ public class AiProviderConfig
             "qwen-qwq-32b",
             "mistral-saba-24b",
             "gemma2-9b-it",
-            "whisper-large-v3-turbo",
-            "whisper-large-v3",
-            "meta-llama/llama-4-maverick-17b-128e-instruct",
-            "meta-llama/llama-4-scout-17b-16e-instruct"
+            "whisper-large-v3-turbo"
+        },
+        [AiProvider.OpenRouter] = new()
+        {
+            "google/gemini-2.5-flash",
+            "google/gemini-2.5-pro",
+            "deepseek/deepseek-r1",
+            "deepseek/deepseek-chat",
+            "anthropic/claude-3.7-sonnet",
+            "openai/gpt-4o",
+            "openai/gpt-4o-mini",
+            "meta-llama/llama-3.3-70b-instruct",
+            "qwen/qwen-2.5-72b-instruct",
+            "mistralai/mistral-large-2411"
         },
         [AiProvider.OpenAI] = new()
         {
@@ -54,6 +61,7 @@ public class AiProviderConfig
             "gpt-4o-mini",
             "o3-mini",
             "o1",
+            "o1-mini",
             "gpt-4-turbo"
         },
         [AiProvider.AnthropicClaude] = new()
@@ -68,13 +76,24 @@ public class AiProviderConfig
             "deepseek-chat",
             "deepseek-reasoner"
         },
-        [AiProvider.Ollama] = new()
+        [AiProvider.OllamaLocal] = new()
         {
             "llama3.2-vision",
             "llava:latest",
             "qwen2.5-vl:latest",
+            "deepseek-r1:14b",
+            "deepseek-r1:8b",
+            "llama3.3:70b",
             "mistral:latest",
-            "deepseek-r1:latest"
+            "phi4:latest"
+        },
+        [AiProvider.OllamaCloud] = new()
+        {
+            "llama3.2-vision",
+            "deepseek-r1:latest",
+            "qwen2.5-vl:latest",
+            "llama3.3:latest",
+            "mistral:latest"
         },
         [AiProvider.CustomOpenAICompatible] = new()
         {
@@ -85,23 +104,25 @@ public class AiProviderConfig
     public static readonly Dictionary<AiProvider, string> ProviderGuide = new()
     {
         [AiProvider.GoogleGemini] = "💡 Google AI Studio (aistudio.google.com/app/apikey) ga kiring va 1 daqiqada 100% bepul API kalit oling.",
-        [AiProvider.GroqAI] = "💡 Groq Console (console.groq.com/keys) ga kiring va chaqmoqdek tezkor (500+ tok/s) bepul API kalit oling.",
-        [AiProvider.OpenAI] = "💡 OpenAI Platform (platform.openai.com/api-keys) ga kiring va yangi Secret Key yarating.",
+        [AiProvider.GroqAI] = "💡 Groq Console (console.groq.com/keys) ga kiring va ultra-tezkor (500+ tok/s) bepul API kalit oling.",
+        [AiProvider.OpenRouter] = "💡 OpenRouter (openrouter.ai/keys) ga kiring va yagona API kalit orqali 300+ AI modellardan foydalaning.",
+        [AiProvider.OpenAI] = "💡 OpenAI Platform (platform.openai.com/api-keys) ga kiring va Secret Key yarating.",
         [AiProvider.AnthropicClaude] = "💡 Anthropic Console (console.anthropic.com/settings/keys) orqali Claude API kalit oling.",
-        [AiProvider.DeepSeek] = "💡 DeepSeek Platform (platform.deepseek.com/api_keys) dan arzon va tezkor API kalit oling.",
-        [AiProvider.Ollama] = "💡 Kompyuteringizda 'ollama run llama3.2-vision' buyrug'ini bering (API kalit shart emas, 100% lokal).",
+        [AiProvider.DeepSeek] = "💡 DeepSeek Platform (platform.deepseek.com/api_keys) dan arzon va kuchli API kalit oling.",
+        [AiProvider.OllamaLocal] = "💡 Kompyuteringizda 'ollama run llama3.2-vision' buyrug'ini bering (Lokal, API kalitsiz).",
+        [AiProvider.OllamaCloud] = "💡 Masofaviy Ollama serveringiz manzilini (Base URL) va model nomini kiriting.",
         [AiProvider.CustomOpenAICompatible] = "💡 O'zingizning OpenAI-mos serveringiz manzilini (Base URL) va API kalitingizni kiriting."
     };
 
     public static readonly Dictionary<string, string> FallbackModels = new()
     {
-        ["gemini-3-pro"] = "gemini-2.5-pro",
         ["gemini-2.5-pro"] = "gemini-2.5-flash",
-        ["gemini-3-flash"] = "gemini-2.5-flash",
-        ["gemini-3.7-flash"] = "gemini-2.5-flash",
         ["gemini-2.5-flash"] = "gemini-2.5-flash-lite",
+        ["gemini-2.0-flash"] = "gemini-1.5-flash",
         ["llama-3.3-70b-versatile"] = "llama-3.1-8b-instant",
         ["deepseek-r1-distill-llama-70b"] = "llama-3.3-70b-versatile",
+        ["google/gemini-2.5-pro"] = "google/gemini-2.5-flash",
+        ["deepseek/deepseek-r1"] = "deepseek/deepseek-chat",
         ["gpt-4o"] = "gpt-4o-mini",
         ["claude-3-7-sonnet-20250219"] = "claude-3-5-sonnet-20241022",
         ["claude-3-5-sonnet-20241022"] = "claude-3-5-haiku-20241022",

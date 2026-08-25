@@ -693,9 +693,14 @@ public partial class MainWindow : Window
 
             if (PnlCustomBaseUrl != null)
             {
-                PnlCustomBaseUrl.Visibility = (provider == AiProvider.Ollama || provider == AiProvider.CustomOpenAICompatible)
+                PnlCustomBaseUrl.Visibility = (provider == AiProvider.OllamaLocal || provider == AiProvider.OllamaCloud || provider == AiProvider.CustomOpenAICompatible)
                     ? Visibility.Visible
                     : Visibility.Collapsed;
+
+                if (provider == AiProvider.OllamaLocal && (string.IsNullOrWhiteSpace(TxtCustomBaseUrl.Text) || TxtCustomBaseUrl.Text.Contains("8000")))
+                {
+                    TxtCustomBaseUrl.Text = "http://localhost:11434";
+                }
             }
 
             var key = _config.GetApiKey(provider);
@@ -709,14 +714,49 @@ public partial class MainWindow : Window
         if (CmbModelName == null) return;
         CmbModelName.Items.Clear();
 
-        if (AiProviderConfig.RecommendedModels.TryGetValue(provider, out var models))
+        var models = _config.GetModelsForProvider(provider);
+        foreach (var model in models)
         {
-            foreach (var model in models)
-            {
-                CmbModelName.Items.Add(model);
-            }
-            if (CmbModelName.Items.Count > 0) CmbModelName.SelectedIndex = 0;
+            CmbModelName.Items.Add(model);
         }
+
+        if (CmbModelName.Items.Count > 0)
+        {
+            CmbModelName.SelectedIndex = 0;
+        }
+    }
+
+    private void BtnAddCustomModel_Click(object sender, RoutedEventArgs e)
+    {
+        var newModel = TxtNewCustomModel?.Text?.Trim();
+        if (string.IsNullOrWhiteSpace(newModel))
+        {
+            MessageBox.Show("Iltimos, qo'shmoqchi bo'lgan model nomini yozing.", "Xabar", MessageBoxButton.OK, MessageBoxImage.Information);
+            return;
+        }
+
+        var provider = GetSelectedProvider();
+        _config.AddCustomModel(provider, newModel);
+        if (TxtNewCustomModel != null) TxtNewCustomModel.Text = string.Empty;
+
+        PopulateModelNames(provider);
+        CmbModelName.Text = newModel;
+        _config.SelectedModel = newModel;
+        _config.Save();
+
+        MessageBox.Show($"\"{newModel}\" modeli {provider} ro'yxatiga muvaffaqiyatli qo'shildi!", "Muvaffaqiyatli", MessageBoxButton.OK, MessageBoxImage.Information);
+    }
+
+    private void BtnDeleteCustomModel_Click(object sender, RoutedEventArgs e)
+    {
+        var currentModel = CmbModelName?.Text?.Trim();
+        if (string.IsNullOrWhiteSpace(currentModel)) return;
+
+        var provider = GetSelectedProvider();
+        _config.RemoveCustomModel(provider, currentModel);
+        PopulateModelNames(provider);
+
+        MessageBox.Show($"\"{currentModel}\" modeli {provider} ro'yxatidan o'chirildi.", "O'chirildi", MessageBoxButton.OK, MessageBoxImage.Information);
     }
 
     private void TxtApiKey_PasswordChanged(object sender, RoutedEventArgs e)
@@ -727,8 +767,23 @@ public partial class MainWindow : Window
         UpdateKeyStatusAndGuide(provider, key);
     }
 
-    private void CmbModelName_LostFocus(object sender, RoutedEventArgs e) { }
-    private void TxtCustomBaseUrl_LostFocus(object sender, RoutedEventArgs e) { }
+    private void CmbModelName_LostFocus(object sender, RoutedEventArgs e)
+    {
+        if (_isInitializing || CmbModelName == null) return;
+        var custom = CmbModelName.Text?.Trim();
+        if (!string.IsNullOrEmpty(custom))
+        {
+            _config.SelectedModel = custom;
+            _config.Save();
+        }
+    }
+
+    private void TxtCustomBaseUrl_LostFocus(object sender, RoutedEventArgs e)
+    {
+        if (_isInitializing || TxtCustomBaseUrl == null) return;
+        _config.CustomBaseUrl = TxtCustomBaseUrl.Text?.Trim();
+        _config.Save();
+    }
 
     private void UpdateKeyStatusAndGuide(AiProvider provider, string key)
     {
@@ -1032,7 +1087,7 @@ public partial class MainWindow : Window
         }
 
         var aiConfig = GetCurrentAiConfig();
-        if (aiConfig.Provider != AiProvider.Ollama && string.IsNullOrWhiteSpace(aiConfig.ApiKey))
+        if (aiConfig.Provider != AiProvider.OllamaLocal && string.IsNullOrWhiteSpace(aiConfig.ApiKey))
         {
             if (PreviewInnerBorder != null) PreviewInnerBorder.Visibility = Visibility.Collapsed;
             PnlApiKeyModal.Visibility = Visibility.Visible;

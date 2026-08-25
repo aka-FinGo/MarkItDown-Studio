@@ -522,12 +522,15 @@ export async function convertFileClient(
         aiResult = await convertWithGeminiApi(base64, effectiveMime, file.name, apiKey!, modelName, options.customPrompt);
       } else if (provider === "GroqAI") {
         aiResult = await convertWithOpenAiApi(base64, effectiveMime, file.name, apiKey!, "https://api.groq.com/openai/v1/chat/completions", modelName, options.customPrompt);
+      } else if (provider === "OpenRouter") {
+        aiResult = await convertWithOpenAiApi(base64, effectiveMime, file.name, apiKey!, "https://openrouter.ai/api/v1/chat/completions", modelName, options.customPrompt);
       } else if (provider === "DeepSeek") {
         aiResult = await convertWithOpenAiApi(base64, effectiveMime, file.name, apiKey!, "https://api.deepseek.com/v1/chat/completions", modelName, options.customPrompt);
       } else if (provider === "OpenAI") {
         aiResult = await convertWithOpenAiApi(base64, effectiveMime, file.name, apiKey!, "https://api.openai.com/v1/chat/completions", modelName, options.customPrompt);
       } else {
-        aiResult = await convertWithOpenAiApi(base64, effectiveMime, file.name, apiKey!, customBaseUrl || "http://localhost:11434/v1/chat/completions", modelName, options.customPrompt);
+        const ollamaBase = customBaseUrl ? (customBaseUrl.endsWith("/v1/chat/completions") ? customBaseUrl : `${customBaseUrl.replace(/\/+$/, "")}/v1/chat/completions`) : "http://localhost:11434/v1/chat/completions";
+        aiResult = await convertWithOpenAiApi(base64, effectiveMime, file.name, apiKey!, ollamaBase, modelName, options.customPrompt);
       }
 
       tokensConsumed = aiResult.tokensConsumed;

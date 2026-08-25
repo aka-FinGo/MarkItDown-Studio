@@ -33,7 +33,7 @@ public class UniversalAiClient : IUniversalAiClient
         string? customPrompt = null,
         CancellationToken ct = default)
     {
-        if (config.Provider != AiProvider.Ollama && string.IsNullOrWhiteSpace(config.ApiKey))
+        if (config.Provider != AiProvider.OllamaLocal && string.IsNullOrWhiteSpace(config.ApiKey))
         {
             throw new ArgumentException("Ushbu provayder uchun API Kalit talab qilinadi.", nameof(config.ApiKey));
         }
@@ -75,10 +75,12 @@ public class UniversalAiClient : IUniversalAiClient
         {
             AiProvider.GoogleGemini => CallGeminiAsync(fileBytes, mimeType, fileName, config, modelName, customPrompt, ct),
             AiProvider.GroqAI => CallOpenAiCompatibleAsync(fileBytes, mimeType, fileName, config, "https://api.groq.com/openai/v1/chat/completions", modelName, customPrompt, ct),
+            AiProvider.OpenRouter => CallOpenAiCompatibleAsync(fileBytes, mimeType, fileName, config, "https://openrouter.ai/api/v1/chat/completions", modelName, customPrompt, ct),
             AiProvider.OpenAI => CallOpenAiCompatibleAsync(fileBytes, mimeType, fileName, config, "https://api.openai.com/v1/chat/completions", modelName, customPrompt, ct),
             AiProvider.AnthropicClaude => CallClaudeAsync(fileBytes, mimeType, fileName, config, modelName, customPrompt, ct),
             AiProvider.DeepSeek => CallOpenAiCompatibleAsync(fileBytes, mimeType, fileName, config, "https://api.deepseek.com/v1/chat/completions", modelName, customPrompt, ct),
-            AiProvider.Ollama => CallOllamaAsync(fileBytes, mimeType, fileName, config, modelName, customPrompt, ct),
+            AiProvider.OllamaLocal => CallOllamaAsync(fileBytes, mimeType, fileName, config, modelName, customPrompt, ct),
+            AiProvider.OllamaCloud => CallOllamaAsync(fileBytes, mimeType, fileName, config, modelName, customPrompt, ct),
             AiProvider.CustomOpenAICompatible => CallOpenAiCompatibleAsync(fileBytes, mimeType, fileName, config, config.CustomBaseUrl ?? "http://localhost:8000/v1/chat/completions", modelName, customPrompt, ct),
             _ => throw new NotSupportedException($"Provayder qo'llab-quvvatlanmaydi: {config.Provider}")
         };
@@ -209,6 +211,11 @@ public class UniversalAiClient : IUniversalAiClient
         var json = JsonSerializer.Serialize(payload);
         using var request = new HttpRequestMessage(HttpMethod.Post, endpointUrl);
         request.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", config.ApiKey);
+        if (config.Provider == AiProvider.OpenRouter)
+        {
+            request.Headers.Add("HTTP-Referer", "https://github.com/aka-FinGo/MarkItDown-Studio");
+            request.Headers.Add("X-Title", "MarkItDown Studio");
+        }
         request.Content = new StringContent(json, Encoding.UTF8, "application/json");
 
         var response = await _httpClient.SendAsync(request, ct);
