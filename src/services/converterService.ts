@@ -153,16 +153,26 @@ export function cleanOcrText(rawText: string): string {
   return cleaned.join("\n").trim();
 }
 
-// Client-Side Offline WebAssembly OCR via Tesseract.js with auto-cleaning
+// Client-Side Offline WebAssembly OCR via Tesseract.js with uzb_cyrl and auto-cleaning
 export async function runClientOfflineOcr(imageSource: Blob | string): Promise<string> {
   try {
-    const worker = await createWorker("rus+eng");
+    // Priority 1: Official Uzbek Cyrillic + Uzbek Latin + Russian + English
+    const worker = await createWorker(["uzb_cyrl", "uzb", "rus", "eng"]);
     const ret = await worker.recognize(imageSource);
     await worker.terminate();
     return cleanOcrText(ret.data.text);
   } catch (err) {
-    console.warn("Offline OCR warning:", err);
-    return "";
+    console.warn("uzb_cyrl OCR warning, falling back to rus+eng:", err);
+    try {
+      // Fallback: Standard rus+eng if offline model is not yet cached
+      const fallbackWorker = await createWorker("rus+eng");
+      const ret = await fallbackWorker.recognize(imageSource);
+      await fallbackWorker.terminate();
+      return cleanOcrText(ret.data.text);
+    } catch (fallbackErr) {
+      console.error("Offline OCR failed:", fallbackErr);
+      return "";
+    }
   }
 }
 

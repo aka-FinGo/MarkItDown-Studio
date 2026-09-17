@@ -44,15 +44,21 @@ public static class WindowsNativeOcr
                 ExifOrientationMode.RespectExifOrientation,
                 ColorManagementMode.ColorManageToSRgb);
 
-            // Find best engines: Russian (for Cyrillic) and English (for Latin)
+            // Find best engines: Uzbek Cyrillic, Russian (for Cyrillic) and English/Uzbek Latin
             var available = OcrEngine.AvailableRecognizerLanguages;
-            var ruLang = available.FirstOrDefault(l => l.LanguageTag.StartsWith("ru", StringComparison.OrdinalIgnoreCase)
-                                                    || l.LanguageTag.StartsWith("uz-Cyrl", StringComparison.OrdinalIgnoreCase));
+            var uzLang = available.FirstOrDefault(l => l.LanguageTag.StartsWith("uz-Cyrl", StringComparison.OrdinalIgnoreCase)
+                                                    || l.LanguageTag.StartsWith("uz", StringComparison.OrdinalIgnoreCase));
+            var ruLang = available.FirstOrDefault(l => l.LanguageTag.StartsWith("ru", StringComparison.OrdinalIgnoreCase));
             var enLang = available.FirstOrDefault(l => l.LanguageTag.StartsWith("en", StringComparison.OrdinalIgnoreCase)
                                                     || l.LanguageTag.StartsWith("uz-Latn", StringComparison.OrdinalIgnoreCase));
 
             var enginesToTry = new List<OcrEngine>();
-            if (ruLang != null)
+            if (uzLang != null)
+            {
+                var engUz = OcrEngine.TryCreateFromLanguage(uzLang);
+                if (engUz != null) enginesToTry.Add(engUz);
+            }
+            if (ruLang != null && ruLang != uzLang)
             {
                 var engRu = OcrEngine.TryCreateFromLanguage(ruLang);
                 if (engRu != null) enginesToTry.Add(engRu);

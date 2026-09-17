@@ -1360,4 +1360,88 @@ Tegishli # Sarlavhalar, ## Kichik sarlavhalar, - Ro'yxatlar, |---| Jadvallar, > 
             MessageBox.Show($"Fayl saqlandi:\n{dlg.FileName}", "Muvaffaqiyatli", MessageBoxButton.OK, MessageBoxImage.Information);
         }
     }
+
+    private void BtnSaveAllZip_Click(object sender, RoutedEventArgs e)
+    {
+        var activeText = _currentContentType == "PlainText" ? TxtPlainTextEditor?.Text : TxtMarkdownEditor?.Text;
+
+        if (ConvertedItems.Count == 0)
+        {
+            if (string.IsNullOrWhiteSpace(activeText))
+            {
+                MessageBox.Show("Hali saqlash uchun hech qanday matn yoki fayl yo'q.", "Xabar", MessageBoxButton.OK, MessageBoxImage.Information);
+                return;
+            }
+
+            var singleDlg = new SaveFileDialog
+            {
+                FileName = $"MarkdownStudio_Export_{DateTime.Now:yyyyMMdd_HHmmss}.zip",
+                Filter = "ZIP Arxiv (*.zip)|*.zip"
+            };
+
+            if (singleDlg.ShowDialog() == true)
+            {
+                try
+                {
+                    using var fs = new FileStream(singleDlg.FileName, FileMode.Create);
+                    using var zip = new System.IO.Compression.ZipArchive(fs, System.IO.Compression.ZipArchiveMode.Create);
+                    var entry = zip.CreateEntry("document.md");
+                    using var s = entry.Open();
+                    using var wr = new StreamWriter(s, Encoding.UTF8);
+                    wr.Write(activeText);
+
+                    MessageBox.Show($"Fayl muvaffaqiyatli ZIP ga saqlandi:\n{singleDlg.FileName}", "Muvaffaqiyatli", MessageBoxButton.OK, MessageBoxImage.Information);
+                }
+                catch (Exception ex)
+                {
+                    MessageBox.Show($"ZIP saqlashda xatolik: {ex.Message}", "Xatolik", MessageBoxButton.OK, MessageBoxImage.Error);
+                }
+            }
+            return;
+        }
+
+        var dlg = new SaveFileDialog
+        {
+            FileName = $"MarkdownStudio_Barcha_Fayllar_{DateTime.Now:yyyyMMdd_HHmmss}.zip",
+            Filter = "ZIP Arxiv (*.zip)|*.zip"
+        };
+
+        if (dlg.ShowDialog() == true)
+        {
+            try
+            {
+                using var fs = new FileStream(dlg.FileName, FileMode.Create);
+                using var zip = new System.IO.Compression.ZipArchive(fs, System.IO.Compression.ZipArchiveMode.Create);
+
+                int savedCount = 0;
+                var usedNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+                foreach (var item in ConvertedItems)
+                {
+                    var baseName = Path.GetFileNameWithoutExtension(item.FileName);
+                    if (string.IsNullOrWhiteSpace(baseName)) baseName = "Hujjat";
+
+                    var entryName = $"{baseName}.md";
+                    int count = 1;
+                    while (usedNames.Contains(entryName))
+                    {
+                        entryName = $"{baseName}_{count++}.md";
+                    }
+                    usedNames.Add(entryName);
+
+                    var entry = zip.CreateEntry(entryName);
+                    using var s = entry.Open();
+                    using var wr = new StreamWriter(s, Encoding.UTF8);
+                    wr.Write(item.Markdown);
+                    savedCount++;
+                }
+
+                MessageBox.Show($"Barcha {savedCount} ta Markdown fayl muvaffaqiyatli bitta ZIP arxivga saqlandi!\n\nYo'li: {dlg.FileName}", "Muvaffaqiyatli", MessageBoxButton.OK, MessageBoxImage.Information);
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"ZIP saqlashda xatolik yuz berdi: {ex.Message}", "Xatolik", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+        }
+    }
 }

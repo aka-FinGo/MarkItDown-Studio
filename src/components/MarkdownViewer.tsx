@@ -142,13 +142,14 @@ export const MarkdownViewer: React.FC<MarkdownViewerProps> = ({
         </div>
 
         <div className="flex items-center space-x-2 shrink-0">
-          {items.length > 1 && (
+          {items.length > 0 && (
             <button
               onClick={handleDownloadAllZip}
-              className="flex items-center gap-1 px-2.5 py-1 text-xs font-medium text-indigo-300 bg-indigo-950/80 hover:bg-indigo-900 rounded-lg border border-indigo-500/40 transition-colors cursor-pointer"
+              className="flex items-center gap-1 px-2.5 py-1 text-xs font-semibold text-indigo-300 bg-indigo-950/80 hover:bg-indigo-900 rounded-lg border border-indigo-500/40 transition-colors cursor-pointer"
+              title="Barcha tayyorlangan Markdown fayllarni bitta ZIP arxivda yuklab olish"
             >
               <FileDown className="w-3.5 h-3.5" />
-              <span className="hidden sm:inline">ZIP qilib yuklash</span>
+              <span>ZIP qilib yuklash {items.length > 1 ? `(${items.length})` : ""}</span>
             </button>
           )}
 
@@ -225,6 +226,15 @@ export const MarkdownViewer: React.FC<MarkdownViewerProps> = ({
           >
             <Download className="w-3.5 h-3.5" />
             <span>.md Saqlash</span>
+          </button>
+
+          <button
+            onClick={handleDownloadAllZip}
+            className="flex items-center gap-1.5 px-3.5 py-1.5 text-xs font-bold text-indigo-200 bg-indigo-950/80 hover:bg-indigo-900 border border-indigo-500/50 rounded-xl shadow-xs transition-colors cursor-pointer"
+            title="Barcha tayyorlangan Markdown fayllarni bitta ZIP arxivda yuklab olish"
+          >
+            <FileDown className="w-3.5 h-3.5 text-indigo-400" />
+            <span>📦 ZIP {items.length > 1 ? `(${items.length})` : ""}</span>
           </button>
         </div>
       </div>

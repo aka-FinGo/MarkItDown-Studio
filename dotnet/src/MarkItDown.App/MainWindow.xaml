@@ -354,7 +354,8 @@
                             <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
                                 <Button x:Name="BtnAiProofread" Click="BtnAiProofread_Click" Style="{StaticResource GlassButton}" Content="✨ AI Bilan Tekshirish" Margin="0,0,8,0" Padding="12,6" FontSize="11" ToolTip="Grammatika, jadvallar va format xatoliklarini AI orqali tekshirish" />
                                 <Button x:Name="BtnCopyMarkdown" Click="BtnCopyMarkdown_Click" Style="{StaticResource GlassButton}" Content="📋 Nusxa olish" Margin="0,0,8,0" Padding="12,6" FontSize="11" />
-                                <Button x:Name="BtnSaveMarkdown" Click="BtnSaveMarkdown_Click" Style="{StaticResource AccentButton}" Content="💾 .md Saqlash" Padding="14,6" FontSize="11" FontWeight="Bold" />
+                                <Button x:Name="BtnSaveMarkdown" Click="BtnSaveMarkdown_Click" Style="{StaticResource AccentButton}" Content="💾 .md Saqlash" Margin="0,0,8,0" Padding="14,6" FontSize="11" FontWeight="Bold" />
+                                <Button x:Name="BtnSaveAllZip" Click="BtnSaveAllZip_Click" Style="{StaticResource AccentButton}" Content="📦 Barchasini ZIP da Saqlash" Padding="14,6" FontSize="11" FontWeight="Bold" Background="#4F46E5" ToolTip="Barcha tayyorlangan Markdown fayllarni bitta ZIP arxivga solib saqlash" />
                             </StackPanel>
                         </Grid>
 
